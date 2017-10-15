@@ -8,4 +8,5 @@ from wtforms import TextField
 from wtforms.validators import Required, Email, EqualTo
 
 class IndexForm(Form):
+
     hashtag  = TextField('hashtag', [Required(message='You must enter a hashtag')])
