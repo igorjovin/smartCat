@@ -10,7 +10,12 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
 from sklearn import metrics
+from sklearn.svm import SVC
 from collections import defaultdict
+import pandas as pd
+import nltk
+nltk.download('wordnet')
+from nltk import WordNetLemmatizer
 
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
@@ -37,15 +42,27 @@ class TwitterStreamListener(StreamListener):
 class TweetPreprocessor():
 
     tweet = ""
+    emoji_pattern = re.compile(
+        u"(\ud83d[\ude00-\ude4f])|"  # emoticons
+        u"(\ud83c[\udf00-\uffff])|"  # symbols & pictographs (1 of 2)
+        u"(\ud83d[\u0000-\uddff])|"  # symbols & pictographs (2 of 2)
+        u"(\ud83d[\ude80-\udeff])|"  # transport & map symbols
+        u"(\ud83c[\udde0-\uddff])"  # flags (iOS)
+        "+", flags=re.UNICODE)
 
     def __init__(self, tweet):
         self.tweet = tweet
 
     def perform_preprocessing(self):
+        #ls = LancasterStemmer()
+        lemmatizer = WordNetLemmatizer()
+        self.emoji_pattern.sub(r'', self.tweet)
         tweet_parts = self.tweet.split(" ")
         preprocessed_tweet = ""
         for part in tweet_parts:
-            part.lower()
+            #part = ls.stem(part)
+            part.encode('utf-8')
+            part = lemmatizer.lemmatize(part)
             part = self.removeRTSign(part)
             part = self.removeUsername(part)
             part = self.removeUrl(part)
@@ -70,7 +87,7 @@ class TweetPreprocessor():
 
 class TwitterKMeans():
 
-    num_of_clusters = 5 #deafult
+    num_of_clusters = 5 #default
 
     def __init__(self, num_of_clusters):
         self.num_of_clusters = num_of_clusters
@@ -79,7 +96,8 @@ class TwitterKMeans():
         km = KMeans(n_clusters=num_of_clusters, init='k-means++', max_iter=100, n_init=1,
                 verbose=True)
         vectorizer = TfidfVectorizer(stop_words='english',
-                                       norm='l2')
+                                       norm='l2',
+                                       lowercase=True)
         X = vectorizer.fit_transform(tweets)
         print("Clustering sparse data with %s" % km)
         t0 = time()
@@ -96,7 +114,29 @@ class TwitterKMeans():
             tweets_with_groups[i].append(tweets[j])
             j = j + 1
         return tweets_with_groups
-        #print(labels)
+
+class TweetClassifier():
+
+    classifier = SVC()
+    vectorizer = TfidfVectorizer(min_df=2,
+                             max_df = 0.8,
+                             sublinear_tf=True)
+
+    def classify(self):
+        dataset = pd.read_csv("/Users/igorjovin/Desktop/SmartCat/twitter-miner/app/mod_twitter/dataset.csv",
+            header=None, names=['label','tweet'])
+        print(dataset.shape)
+        y = dataset['label'].tolist()
+        X = dataset['tweet'].tolist()
+        X = self.vectorizer.fit_transform(X)
+        self.classifier.fit(X, y)
+
+    def predict(self, tweets):
+        tweets = self.vectorizer.transform(tweets)
+        predictions = self.classifier.predict(tweets)
+        print(predictions)
+        return predictions
+
 
 
  

@@ -1,13 +1,16 @@
 # Import flask dependencies
 from flask import Blueprint, request, render_template, \
-                  flash, g, redirect, url_for
+                  flash, g, redirect, url_for, make_response
+import StringIO
+import csv
 import tweepy
 from tweepy import OAuthHandler
 from tweepy import Stream
+from collections import defaultdict
 
 # Import module forms
-from app.mod_twitter.forms import IndexForm
-from app.mod_twitter.services import TwitterKMeans, TweetPreprocessor
+from app.mod_twitter.forms import IndexForm, ClusterResultsForm, PredictionsForm, AfterTrainingForm
+from app.mod_twitter.services import TwitterKMeans, TweetPreprocessor, TweetClassifier
 
 #Twitter auth credentials
 consumer_key = '9anEflCDSYuUY36Wl2kecwkxe'
@@ -21,14 +24,14 @@ api = tweepy.API(auth)
 
 # Define the blueprint: 'auth', set its url prefix: app.url/auth
 mod_twitter = Blueprint('twitter', __name__, url_prefix='/twitter')
-tweets = list() #dataset
+tweets_with_groups = defaultdict(list)
+classifier = TweetClassifier()
 
 def process(tweet):
     preprocessed_tweet = TweetPreprocessor(tweet.text).perform_preprocessing()
     write_to_file(tweet)
     #print preprocessed_tweet
     return preprocessed_tweet
-    #if preprocessed_tweet not in tweets:
 
 def write_to_file(tweet):
     try:
@@ -37,21 +40,58 @@ def write_to_file(tweet):
     except Exception as e:
         print("Error on_data: %s" % str(e))
 
+@mod_twitter.route('/index/', methods=['GET'])
+def index():
+    form = IndexForm(request.form)
+    return render_template("twitter/index.html", form=form)
+
+@mod_twitter.route('/export')
+def export():
+    si = StringIO.StringIO()
+    cw = csv.writer(si, delimiter=',')
+    global tweets_with_groups
+    for label, value in tweets_with_groups.iteritems():
+        print("Label %s" % label)
+        for item in value:
+            #labeled_item = str(label) + ", " + str(item.encode('utf-8'))
+            cw.writerow([str(label), str(item.encode('utf-8'))])
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=dataset.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+@mod_twitter.route('/train')
+def train():
+    global classifier
+    classifier.classify()
+    form = AfterTrainingForm(request.form)
+    return render_template("twitter/after_training.html", form=form)
+
+@mod_twitter.route('/predict/', methods=['GET', 'POST'])
+def predict():
+    form = PredictionsForm(request.form)
+    global classifier
+    tweets = list()
+    for tweet in tweepy.Cursor(api.search, q=form.hashtag.data, lang="en").items(100):
+        tweet_text = process(tweet)
+        if tweet_text not in tweets:
+           tweets.append(tweet_text)
+
+    classifier.predict(tweets)
+    return render_template("twitter/predictions.html", form=form)
+
 # Set the route and accepted methods
 @mod_twitter.route('/search/', methods=['GET', 'POST'])
-def index():
-
-    # If form is submitted
-    form = IndexForm(request.form)
+def cluster_results():
+    form = ClusterResultsForm(request.form)
+    global tweets_with_groups
     tweets = list()
-    #form.hashtag.data
-    for tweet in tweepy.Cursor(api.search, q="cassandra", lang="en").items(200):
+    for tweet in tweepy.Cursor(api.search, q=form.hashtag.data, lang="en").items(200):
         tweet_text = process(tweet)
         if tweet_text not in tweets:
     	   tweets.append(tweet_text)
 
     kmeans = TwitterKMeans(5)
     tweets_with_groups = kmeans.perform_clustering(tweets, 5)
-    #for tweet in tweepy.Cursor(api.user_timeline).items():	
 
-    return render_template("twitter/index.html", form=form, tweets = tweets_with_groups)
+    return render_template("twitter/cluster_results.html", form=form, tweets=tweets_with_groups)

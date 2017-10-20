@@ -13,7 +13,7 @@
 
 <div>
   <div>
-    <legend>Search hashtag</legend>
+    <legend>Training completed. Proceed to predictions of new tweets >> </legend>
     {% with errors = get_flashed_messages(category_filter=["error"]) %}
     {% if errors %}
     <div>
@@ -33,7 +33,7 @@
     {% endfor %}
     </div>
     {% endif %}
-    <form method="POST" action="/twitter/search/" accept-charset="UTF-8" role="form">
+    <form method="POST" action="/twitter/predict/" accept-charset="UTF-8" role="form">
       {{ form.csrf_token }}
       {{ render_field(form.hashtag, placeholder="Enter a hashtag",
                                   autofocus="") }}
