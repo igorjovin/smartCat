@@ -23,6 +23,8 @@ import re
 import logging
 import sys
 from time import time
+import os
+from config import BASE_DIR, APP_STATIC
  
 class TwitterStreamListener(StreamListener):
  
@@ -52,6 +54,8 @@ class TweetPreprocessor():
 
     def __init__(self, tweet):
         self.tweet = tweet
+        reload(sys)
+        sys.setdefaultencoding('utf-8')
 
     def perform_preprocessing(self):
         #ls = LancasterStemmer()
@@ -61,11 +65,14 @@ class TweetPreprocessor():
         preprocessed_tweet = ""
         for part in tweet_parts:
             #part = ls.stem(part)
-            part.encode('utf-8')
-            part = lemmatizer.lemmatize(part)
-            part = self.removeRTSign(part)
+            part = part.decode('utf-8')
+            part = part.lower()
+            part = self.removeStopWords(part)
             part = self.removeUsername(part)
             part = self.removeUrl(part)
+            part = self.removePunctuation(part)
+            part = self.removeNumbers(part)
+            part = lemmatizer.lemmatize(part)
             preprocessed_tweet += part + " "
         return preprocessed_tweet
 
@@ -75,13 +82,23 @@ class TweetPreprocessor():
         return part
 
     def removeUrl(self, part):
-        if part.startswith("http:") or part.startswith("https:"):
-            part = ""
+        part = re.sub(r'^https?:\/\/.*[\r\n]*', "", part, flags=re.MULTILINE)
         return part
 
-    def removeRTSign(self, part):
-        if part == 'rt':
-            part = ""
+    def removePunctuation(self, part):
+        part = re.sub("[^\\w\\s]", "", part)
+        return part
+
+    def removeNumbers(self, part):
+        part = re.sub('[0-9]+', "", part)
+        return part
+
+    def removeStopWords(self, part):
+        with open(os.path.join(APP_STATIC, 'stopwords.txt')) as f:
+            lines = f.readlines()
+        for line in lines:
+            if line in part or part == line:
+                part = ""
         return part
 
 
@@ -123,7 +140,7 @@ class TweetClassifier():
                              sublinear_tf=True)
 
     def classify(self):
-        dataset = pd.read_csv("/Users/igorjovin/Desktop/SmartCat/twitter-miner/app/mod_twitter/dataset.csv",
+        dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset.csv'),
             header=None, names=['label','tweet'])
         print(dataset.shape)
         y = dataset['label'].tolist()

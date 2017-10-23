@@ -33,9 +33,11 @@
     {% endfor %}
     </div>
     {% endif %}
-    <form method="POST" action="/twitter/search/" accept-charset="UTF-8" role="form">
+    <form class="inline" method="POST" action="/twitter/search/" accept-charset="UTF-8" role="form">
       {{ form.csrf_token }}
       {{ render_field(form.hashtag, placeholder="Enter a hashtag",
+                                  autofocus="") }}
+      {{ render_field(form.num_of_clusters, placeholder="Enter a number",
                                   autofocus="") }}
       <div>
       </div>

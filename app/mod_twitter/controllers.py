@@ -7,6 +7,8 @@ import tweepy
 from tweepy import OAuthHandler
 from tweepy import Stream
 from collections import defaultdict
+import os
+from config import BASE_DIR, APP_STATIC
 
 # Import module forms
 from app.mod_twitter.forms import IndexForm, ClusterResultsForm, PredictionsForm, AfterTrainingForm
@@ -62,6 +64,16 @@ def export():
 
 @mod_twitter.route('/train')
 def train():
+    filepath = os.path.join(os.path.join(APP_STATIC, 'dataset.csv'))
+    f = open(filepath, "a")
+    cw = writer=csv.writer(f)
+    global tweets_with_groups
+    for label, value in tweets_with_groups.iteritems():
+        print("Label %s" % label)
+        for item in value:
+            #labeled_item = str(label) + ", " + str(item.encode('utf-8'))
+            cw.writerow([str(label), str(item.encode('utf-8'))])
+    f.close()
     global classifier
     classifier.classify()
     form = AfterTrainingForm(request.form)
@@ -91,7 +103,7 @@ def cluster_results():
         if tweet_text not in tweets:
     	   tweets.append(tweet_text)
 
-    kmeans = TwitterKMeans(5)
-    tweets_with_groups = kmeans.perform_clustering(tweets, 5)
+    kmeans = TwitterKMeans(int(form.num_of_clusters.data))
+    tweets_with_groups = kmeans.perform_clustering(tweets, int(form.num_of_clusters.data))
 
     return render_template("twitter/cluster_results.html", form=form, tweets=tweets_with_groups)
