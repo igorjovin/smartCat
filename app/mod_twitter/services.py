@@ -4,18 +4,19 @@ from tweepy.streaming import StreamListener
 
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.decomposition import TruncatedSVD
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
 from sklearn import metrics
 from sklearn.svm import SVC
+from sklearn.naive_bayes import MultinomialNB
 from collections import defaultdict
 import pandas as pd
 import nltk
-nltk.download('wordnet')
-from nltk import WordNetLemmatizer
+#nltk.download('wordnet')
+#from nltk import WordNetLemmatizer
 
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
@@ -44,6 +45,7 @@ class TwitterStreamListener(StreamListener):
 class TweetPreprocessor():
 
     tweet = ""
+    hashtag = ""
     emoji_pattern = re.compile(
         u"(\ud83d[\ude00-\ude4f])|"  # emoticons
         u"(\ud83c[\udf00-\uffff])|"  # symbols & pictographs (1 of 2)
@@ -52,14 +54,15 @@ class TweetPreprocessor():
         u"(\ud83c[\udde0-\uddff])"  # flags (iOS)
         "+", flags=re.UNICODE)
 
-    def __init__(self, tweet):
+    def __init__(self, tweet, hashtag):
         self.tweet = tweet
+        self.hashtag = hashtag
         reload(sys)
         sys.setdefaultencoding('utf-8')
 
     def perform_preprocessing(self):
         #ls = LancasterStemmer()
-        lemmatizer = WordNetLemmatizer()
+        #lemmatizer = WordNetLemmatizer()
         self.emoji_pattern.sub(r'', self.tweet)
         tweet_parts = self.tweet.split(" ")
         preprocessed_tweet = ""
@@ -71,8 +74,9 @@ class TweetPreprocessor():
             part = self.removeUsername(part)
             part = self.removeUrl(part)
             part = self.removePunctuation(part)
+            part = self.removeHashtag(part)
             part = self.removeNumbers(part)
-            part = lemmatizer.lemmatize(part)
+            #part = lemmatizer.lemmatize(part)
             preprocessed_tweet += part + " "
         return preprocessed_tweet
 
@@ -99,6 +103,12 @@ class TweetPreprocessor():
         for line in lines:
             if line in part or part == line:
                 part = ""
+        return part
+
+    def removeHashtag(self, part):
+        stripped_hashtag = self.hashtag.replace("#", "")
+        if part == self.hashtag or part == stripped_hashtag:
+            part = ""
         return part
 
 
@@ -134,13 +144,13 @@ class TwitterKMeans():
 
 class TweetClassifier():
 
-    classifier = SVC()
-    vectorizer = TfidfVectorizer(min_df=2,
-                             max_df = 0.8,
-                             sublinear_tf=True)
+    classifier = MultinomialNB()#SVC()
+    vectorizer = CountVectorizer()#TfidfVectorizer(min_df=2,
+                             #max_df = 0.8,
+                             #sublinear_tf=True)
 
-    def classify(self):
-        dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset.csv'),
+    def classify(self, hashtag):
+        dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
             header=None, names=['label','tweet'])
         print(dataset.shape)
         y = dataset['label'].tolist()
@@ -149,10 +159,17 @@ class TweetClassifier():
         self.classifier.fit(X, y)
 
     def predict(self, tweets):
-        tweets = self.vectorizer.transform(tweets)
-        predictions = self.classifier.predict(tweets)
+        tweets_vectorized = self.vectorizer.transform(tweets)
+        predictions = self.classifier.predict(tweets_vectorized)
         print(predictions)
-        return predictions
+        tweets_with_predictions = defaultdict(list)
+        j = 0
+        for i in predictions:
+            print("Prediction %s" % i)
+            print(tweets[j])
+            tweets_with_predictions[i].append(tweets[j])
+            j = j + 1
+        return tweets_with_predictions
 
 
 

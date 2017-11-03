@@ -1,31 +1,123 @@
-{% macro render_field(field, placeholder=None) %}
-{% if field.errors %}
-<div>
-{% elif field.flags.error %}
-<div>
-{% else %}
-<div>
-{% endif %}
-    {% set css_class = 'form-control ' + kwargs.pop('class', '') %}
-    {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
-</div>
-{% endmacro %}
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 
 <div>
-  <div> 
-    <div><a href="/twitter/export">Export to dataset</a></div>
-    <div><a href="/twitter/train">Train classifier</a></div>
     <table class="table table-striped table-bordered table-hover">
             {% for key, value in tweets.iteritems() %}
             <tr>
-                <th><input type="text" value="Group {{key}}"/> <input type="submit"value="OK"/></th>    
+                <th id="group_{{key}}">{% if group_names[key] %} {{group_names[key]}} {% else %}Group {{key}}{% endif %}<button onclick="changeGroupName('{{key}}', '{{group_names[key]}}')">Change</button></th> 
             </tr>
               {% for val in value %}
                 <tr>
-                    <td>{{val}}</td>
+                    <td>{{val}}</td> <td id="move_{{loop.index}}_{{key}}"><button onclick="move({{loop.index}}, '{{key}}')">Move</button></td>
                 </tr>
               {% endfor %}
             {% endfor %}
     </table>
-  </div>
+    <div><button onclick="checkGroups()">Train classifier >>></button></div>
 </div>
+
+<script type="text/javascript">
+
+function checkGroups() {
+  {% if group_names|length != tweets|length %}
+    alert("Please rename all the groups");
+    return;
+  {% endif %}
+  location.href = "/twitter/train";
+}
+
+function move(index, key) {
+  var td_id = "#move_" + index + "_" + key;
+  var cancel_elem = "<button onclick=\"cancelMove(" + index + ", " + key + ")\">Cancel</button>";
+  var ok_elem = "<button onclick=\"confirmMove(" + index + ", " + key + ")\">OK</button>";
+  $(td_id).empty();
+  $(td_id).append(getSelect(index, key));
+  $(td_id).append(ok_elem);
+  $(td_id).append(cancel_elem);
+}
+
+function confirmMove(index, key) {
+  var select_id = "#select_" + index + "_" + key;
+  var desired_key = $(select_id).find(":selected").text();
+  $.ajax({
+            url: '/twitter/move',
+            data: JSON.stringify({desired_key: desired_key, key: key, index: index}),
+            contentType: 'application/json; charset=UTF-8',
+            type: 'POST',
+            dataType: "html",
+            success: function(response) {
+              $("#cluster-results").html(response);
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        });
+}
+
+function confirmChangeGroupName(groupKey) {
+  var desired_name = $("#group_input_" + groupKey).val();
+  if (desired_name == "") {
+      alert("Please enter a valid new name for group " + groupKey);
+      return;
+  }
+  $.ajax({
+            url: '/twitter/change_group_name',
+            data: JSON.stringify({desired_name: desired_name, key: groupKey}),
+            contentType: 'application/json; charset=UTF-8',
+            type: 'POST',
+            dataType: "html",
+            success: function(response) {
+              $("#cluster-results").html(response);
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        });
+}
+
+function cancelMove(index, key) {
+  var td_id = "#move_" + index + "_" + key;
+  $(td_id).empty();
+  $(td_id).append("<button onclick='move(" + index + ", " + key + ")'>Move</button>");
+}
+
+function cancelChangeGroupName(groupKey, previousName) {
+  var th_id = "#group_" + groupKey;
+  var groupName = "Group " + groupKey;
+  if (previousName) {
+    groupName = previousName;
+  }
+  $(th_id).empty();
+  $(th_id).append(groupName);
+  $(th_id).append("<button onclick=\"changeGroupName(" + groupKey + ", '" + previousName + "')\">Change</button>");
+}
+
+function changeGroupName(groupKey, previousName) {
+  var th_id = "#group_" + groupKey;
+  var cancel_elem = "<button onclick=\"cancelChangeGroupName(" + groupKey + ", '" + previousName + "')\">Cancel</button>";
+  var ok_elem = "<button onclick=\"confirmChangeGroupName(" + groupKey + ")\">OK</button>";
+  var namePlaceholder = "Group " + groupKey;
+  if (previousName) {
+      namePlaceholder = previousName;
+  }
+  var input_elem = "<input id=\"group_input_" + groupKey + "\" type=\"text\" placeholder=\"" + namePlaceholder + "\"/>";
+  $(th_id).empty();
+  $(th_id).append(input_elem);
+  $(th_id).append(ok_elem);
+  $(th_id).append(cancel_elem);
+}
+
+function getSelect(index, key) {
+  var select = "<select id=\"select_" + index + "_" + key + "\">";
+  {% for key_val, value in tweets.iteritems() %}
+    if ({{key_val}} == key) {
+      select += "<option value='{{key_val}}' selected>{{key_val}}</option>";
+    } else {
+      select += "<option value='{{key_val}}'>{{key_val}}</option>";
+    }
+  {% endfor %}
+  select += "</select>";
+  return select;
+}
+
+</script>

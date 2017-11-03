@@ -13,6 +13,17 @@
 
 <div>
   <div> 
-    PREDICTIONS
+    <table class="table table-striped table-bordered table-hover">
+            {% for key, value in tweets.iteritems() %}
+            <tr>
+                <th>Group {{key}}</th>    
+            </tr>
+              {% for val in value %}
+                <tr>
+                    <td>{{val}}</td>
+                </tr>
+              {% endfor %}
+            {% endfor %}
+    </table>
   </div>
 </div>

@@ -2,7 +2,7 @@
 from flask.ext.wtf import Form
 
 # Import Form elements
-from wtforms import TextField 
+from wtforms import TextField, FieldList 
 
 # Import Form validators
 from wtforms.validators import Required, Email, EqualTo
