@@ -26,4 +26,11 @@ CSRF_SESSION_KEY = "secret"
 # Secret key for signing cookies
 SECRET_KEY = "secret"
 
+#Twitter auth credentials
+TWITTER_CONSUMER_KEY = '9anEflCDSYuUY36Wl2kecwkxe'
+TWITTER_CONSUMER_SECRET = 'bsmj1WqCL8WgyGDfafLkzPOSg9p5QUWDyDgboUWLGeFWVWnsQY'
+TWITTER_ACCESS_TOKEN = '56657567-xKPRh2Y1daGr7848aZjkGyQcE1OWjFKhkeEUxs2En'
+TWITTER_ACCESS_SECRET = 'mve1oAOuGONdfpfZY2SgwGH4NzLoV89bk43v13Zsnhrfz'
+
 APP_STATIC = os.path.join(BASE_DIR, 'app/static')
+

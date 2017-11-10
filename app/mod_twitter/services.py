@@ -10,15 +10,12 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
 from sklearn import metrics
-from sklearn.svm import SVC
-from sklearn.naive_bayes import MultinomialNB
 from collections import defaultdict
 import pandas as pd
 import nltk
-#nltk.download('wordnet')
-#from nltk import WordNetLemmatizer
-
-from sklearn.cluster import KMeans, MiniBatchKMeans
+import pickle
+nltk.download('wordnet')
+from nltk import WordNetLemmatizer
 
 import re
 import logging
@@ -46,6 +43,7 @@ class TweetPreprocessor():
 
     tweet = ""
     hashtag = ""
+    acronym_map = dict()
     emoji_pattern = re.compile(
         u"(\ud83d[\ude00-\ude4f])|"  # emoticons
         u"(\ud83c[\udf00-\uffff])|"  # symbols & pictographs (1 of 2)
@@ -59,118 +57,78 @@ class TweetPreprocessor():
         self.hashtag = hashtag
         reload(sys)
         sys.setdefaultencoding('utf-8')
+        self.init_acronym_map()
 
     def perform_preprocessing(self):
         #ls = LancasterStemmer()
-        #lemmatizer = WordNetLemmatizer()
+        lemmatizer = WordNetLemmatizer()
         self.emoji_pattern.sub(r'', self.tweet)
         tweet_parts = self.tweet.split(" ")
         preprocessed_tweet = ""
         for part in tweet_parts:
             #part = ls.stem(part)
             part = part.decode('utf-8')
+            #part = self.manipulate_hashtag_words(part)
+            part = part.lower().strip()
+            part = self.remove_username(part)
+            part = self.remove_url(part)
+            part = self.replace_acronyms(part)
             part = part.lower()
-            part = self.removeStopWords(part)
-            part = self.removeUsername(part)
-            part = self.removeUrl(part)
-            part = self.removePunctuation(part)
-            part = self.removeHashtag(part)
-            part = self.removeNumbers(part)
-            #part = lemmatizer.lemmatize(part)
+            part = self.remove_stop_words(part)
+            part = self.remove_hashtag(part)
+            part = self.remove_punctuation(part)
+            part = self.remove_numbers(part)
+            part = lemmatizer.lemmatize(part)
+            part = self.remove_stop_words(part)
             preprocessed_tweet += part + " "
-        return preprocessed_tweet
+        return preprocessed_tweet.strip()
 
-    def removeUsername(self, part):
+    def remove_username(self, part):
         if part.startswith('@'):
             part = ""
         return part
 
-    def removeUrl(self, part):
+    def remove_url(self, part):
         part = re.sub(r'^https?:\/\/.*[\r\n]*', "", part, flags=re.MULTILINE)
         return part
 
-    def removePunctuation(self, part):
+    def remove_punctuation(self, part):
         part = re.sub("[^\\w\\s]", "", part)
         return part
 
-    def removeNumbers(self, part):
+    def remove_numbers(self, part):
         part = re.sub('[0-9]+', "", part)
         return part
 
-    def removeStopWords(self, part):
+    def remove_stop_words(self, part):
         with open(os.path.join(APP_STATIC, 'stopwords.txt')) as f:
             lines = f.readlines()
+        #part = part.strip()
         for line in lines:
-            if line in part or part == line:
+            line = line.strip()
+            if part == line:
                 part = ""
+                break
         return part
 
-    def removeHashtag(self, part):
-        stripped_hashtag = self.hashtag.replace("#", "")
-        if part == self.hashtag or part == stripped_hashtag:
+    def remove_hashtag(self, part):
+        stripped_hashtag = self.hashtag.replace("#", "").strip()
+        if part == self.hashtag or stripped_hashtag in part:
             part = ""
         return part
 
+    def manipulate_hashtag_words(self, part):
+        if '#' in part:
+            part = part + " " + part
+        return part
 
-class TwitterKMeans():
+    def replace_acronyms(self, part):
+        if part in self.acronym_map.keys():
+            part = self.acronym_map[part]
+        return part
 
-    num_of_clusters = 5 #default
-
-    def __init__(self, num_of_clusters):
-        self.num_of_clusters = num_of_clusters
-
-    def perform_clustering(self, tweets, num_of_clusters):
-        km = KMeans(n_clusters=num_of_clusters, init='k-means++', max_iter=100, n_init=1,
-                verbose=True)
-        vectorizer = TfidfVectorizer(stop_words='english',
-                                       norm='l2',
-                                       lowercase=True)
-        X = vectorizer.fit_transform(tweets)
-        print("Clustering sparse data with %s" % km)
-        t0 = time()
-        km.fit_transform(X)
-        print("done in %0.3fs" % (time() - t0))
-        print()
-        order_centroids = km.cluster_centers_.argsort()[:, ::-1]
-        labels = km.predict(X)
-        tweets_with_groups = defaultdict(list)
-        j = 0
-        for i in labels:
-            print("Label %s" % i)
-            print(tweets[j])
-            tweets_with_groups[i].append(tweets[j])
-            j = j + 1
-        return tweets_with_groups
-
-class TweetClassifier():
-
-    classifier = MultinomialNB()#SVC()
-    vectorizer = CountVectorizer()#TfidfVectorizer(min_df=2,
-                             #max_df = 0.8,
-                             #sublinear_tf=True)
-
-    def classify(self, hashtag):
-        dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
-            header=None, names=['label','tweet'])
-        print(dataset.shape)
-        y = dataset['label'].tolist()
-        X = dataset['tweet'].tolist()
-        X = self.vectorizer.fit_transform(X)
-        self.classifier.fit(X, y)
-
-    def predict(self, tweets):
-        tweets_vectorized = self.vectorizer.transform(tweets)
-        predictions = self.classifier.predict(tweets_vectorized)
-        print(predictions)
-        tweets_with_predictions = defaultdict(list)
-        j = 0
-        for i in predictions:
-            print("Prediction %s" % i)
-            print(tweets[j])
-            tweets_with_predictions[i].append(tweets[j])
-            j = j + 1
-        return tweets_with_predictions
-
-
-
- 
+    def init_acronym_map(self):
+        with open(os.path.join(APP_STATIC, "acronyms.txt"),'r') as f:
+             for line in f:
+                line_parts = re.split(r'\t+', line)
+                self.acronym_map[line_parts[0]] = line_parts[1]

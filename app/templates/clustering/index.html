@@ -48,14 +48,11 @@
 
 <div id="please-wait" style="display:none">Please wait...</div>
 <button id="predictions">Proceed to predictions >>></button>
-<button id="switch-tweets">Switch tweets</button>
+<div><button id="switch-tweets">Switch tweets</button></div>
 <div id="cluster-results"></div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
-$("#predictions").click(function() {
-  location.href = "/classifier/predictions";
-});
 
 $("#switch-tweets").click(function() {
   $.ajax({
@@ -70,6 +67,10 @@ $("#switch-tweets").click(function() {
                 console.log(error);
             }
         });
+});
+
+$("#predictions").click(function() {
+  location.href = "/classification/predictions";
 });
 
 $("#submit_search").click(function() {
