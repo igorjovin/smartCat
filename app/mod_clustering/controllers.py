@@ -27,6 +27,7 @@ original_tweets_with_groups = defaultdict(list)
 tweets_to_show = defaultdict(list) #tweets which will be shown on the view - either original, or preprocessed
 group_names = {}
 group_list = list()
+num_of_groups = 0
 hashtag = ""
 showing_original_tweets = True
 
@@ -41,23 +42,51 @@ def process(tweet, hashtag):
     preprocessed_tweet = TweetPreprocessor(tweet.text, hashtag).perform_preprocessing()
     return preprocessed_tweet
 
+def update_session():
+    global preprocessed_tweets_with_groups
+    global hashtag
+    global group_names
+    print("HASHTAG " + hashtag)
+    session['preprocessed_tweets_with_groups'] = preprocessed_tweets_with_groups
+    session['hashtag'] = hashtag
+    session['group_names'] = group_names
+    session.modified = True
+
 @mod_clustering.route('/move_to_cluster', methods=['POST'])
 def move_tweet_to_cluster():
     form = ClusterResultsForm(request.form)
     key = str(request.json['key'])
     desired_key = str(request.json['desired_key'])
     tweet_index = int(request.json['index']) - 1
+    if tweet_index == -1:
+        tweet_index = 0
 
+    global group_names
+    global num_of_groups
     global preprocessed_tweets_with_groups
     global original_tweets_with_groups
-    global group_names
+    global tweets_to_show
+
+    if not all(str.isdigit(c) for c in desired_key):
+        desired_name = desired_key.lower().strip()
+        desired_key = int(num_of_groups)
+        num_of_groups = num_of_groups + 1
+        if desired_name not in group_names.values():
+            group_names[str(desired_key)] = str(desired_name)
+
     tweet = preprocessed_tweets_with_groups[key][tweet_index]
     del preprocessed_tweets_with_groups[key][tweet_index]
-    preprocessed_tweets_with_groups[desired_key].append(tweet)
+    preprocessed_tweets_with_groups[str(desired_key)].append(tweet)
 
     tweet = original_tweets_with_groups[key][tweet_index]
     del original_tweets_with_groups[key][tweet_index]
-    original_tweets_with_groups[desired_key].append(tweet)
+    original_tweets_with_groups[str(desired_key)].append(tweet)
+
+    tweets_to_show = preprocessed_tweets_with_groups
+    if showing_original_tweets:
+        tweets_to_show = original_tweets_with_groups
+
+    update_session()
 
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names=group_names)
 
@@ -76,6 +105,8 @@ def remove_tweet_from_cluster():
     tweet = original_tweets_with_groups[key][tweet_index]
     del original_tweets_with_groups[key][tweet_index]
 
+    update_session()
+
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names=group_names)
 
 @mod_clustering.route('/delete_cluster', methods=['DELETE'])
@@ -87,6 +118,9 @@ def delete_cluster():
     global group_names
     del preprocessed_tweets_with_groups[key]
     del original_tweets_with_groups[key]
+    del group_names[key]
+
+    update_session()
 
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names=group_names)
 
@@ -106,6 +140,8 @@ def merge_cluster():
     tweets = original_tweets_with_groups[key]
     del original_tweets_with_groups[key]
     original_tweets_with_groups[desired_key].extend(tweets)
+
+    update_session()
 
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names=group_names)
 
@@ -134,8 +170,17 @@ def change_group_name():
     desired_name= str(request.json['desired_name'])
 
     global group_names
-    group_names[key] = desired_name.lower() 
-    session['group_names'] = group_names
+    global hashtag
+    global preprocessed_tweets_with_groups
+    if desired_name not in group_names.values():
+        group_names[key] = desired_name.lower().strip().replace(" ", "_") 
+        session['preprocessed_tweets_with_groups'] = preprocessed_tweets_with_groups
+        session['hashtag'] = hashtag
+        session['group_names'] = group_names
+        g.hashtag = hashtag
+        g.group_names = group_names
+        g.preprocessed_tweets_with_groups = preprocessed_tweets_with_groups
+        #update_session()
 
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names=group_names)
 
@@ -148,15 +193,17 @@ def cluster_results():
     global tweets_to_show
     global group_names
     global hashtag
+    global num_of_groups
     group_names = {}
     hashtag = str(request.json['hashtag'])
     num_of_clusters = int(request.json['num_of_clusters'])
+    num_of_groups = num_of_clusters
     hashtag = process_hashtag(hashtag)
     preprocessed_tweets = list()
     original_tweets = list()
     for tweet in tweepy.Cursor(api.search, q=hashtag, lang="en").items(200):
         tweet_text = process(tweet, hashtag)
-        if tweet_text not in preprocessed_tweets:
+        if tweet_text not in preprocessed_tweets and len(tweet_text) > 1:
     	   preprocessed_tweets.append(tweet_text)
            original_tweets.append(tweet.text)
 
@@ -164,12 +211,11 @@ def cluster_results():
     preprocessed_tweets_with_groups, original_tweets_with_groups = kmeans.perform_clustering(preprocessed_tweets, original_tweets, num_of_clusters)
     tweets_to_show = original_tweets_with_groups
 
+    #update_session()
     session['preprocessed_tweets_with_groups'] = preprocessed_tweets_with_groups
     session['hashtag'] = hashtag
+    session['group_names'] = group_names
+    print("HASHTAG IN SESSION " + session['hashtag'])
 
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names = group_names)
-
-
-
-
 

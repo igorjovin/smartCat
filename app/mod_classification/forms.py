@@ -14,3 +14,7 @@ class AfterTrainingForm(Form):
 class PredictionsForm(Form):
 
     hashtag  = TextField('hashtag', [Required(message='You must enter a hashtag')])
+
+class CrossValidationForm(Form):
+
+    hashtag  = TextField('hashtag', [Required(message='You must enter a hashtag')])

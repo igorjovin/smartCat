@@ -39,10 +39,11 @@
                                   autofocus="") }}
       <div>
       </div>
-      <button id="submit_search" type="submit" name="submit">Submit</button>
+      <button id="submit-validation" type="submit" name="submit">Submit</button>
       <select id="select-classifier">
         <option value='XGBoost' selected>XGBoost</option>
-        <option value='SVC' selected>SVM (SVC)</option>
+        <option value='SVC' selected>SVC</option>
+        <option value='SVR' selected>SVR</option>
         <option value='NaiveBayes' selected>Naive Bayes</option>
         <option value='RandomForest' selected>Random Forest</option>
         <option value='LinearRegression' selected>Linear Regression</option>
@@ -52,10 +53,8 @@
 </div>
 
 <div id="please-wait" style="display:none">Please wait...</div>
-<button id="retrain" onclick="retrain()">Retrain</button>
 <button id="home">Home</button>
-<button id="cross-validate">Cross validate</button>
-<div id="predictions"></div>
+<div id="validation-results"></div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
@@ -64,53 +63,33 @@ $("#home").click(function() {
   location.href = "/twitter/index/";
 });
 
-$("#cross-validate").click(function() {
-  location.href = "/classification/cross-validation";
-});
-
-$("#submit_search").click(function() {
+$("#submit-validation").click(function() {
   disableForm();
   $.ajax({
-            url: '/classification/predict/',
+            url: '/classification/cross-validate',
             data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: $("#select-classifier").find(":selected").text()}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',
             dataType: "html",
             success: function(response) {
               enableForm();
-              $("#predictions").html(response);
+              $("#validation-results").html(response);
             },
             error: function(error) {
                 console.log(error);
             }
         });
 });
-
-function retrain() {
-  $.ajax({
-            url: '/classification/retrain/',
-            data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: $("#select-classifier").find(":selected").text()}),
-            contentType: 'application/json; charset=UTF-8',
-            type: 'POST',
-            dataType: "html",
-            success: function(response) {
-              enableForm();
-            },
-            error: function(error) {
-                console.log(error);
-            }
-        });
-}
 
 function disableForm() {
   $("#please-wait").show();
   $("#hashtag").prop("disabled", true);
-  $("#submit_search").prop("disabled", true);
+  $("#submit-validation").prop("disabled", true);
 }
 
 function enableForm() {
   $("#please-wait").hide();
   $("#hashtag").prop("disabled", false);
-  $("#submit_search").prop("disabled", false);
+  $("#submit-validation").prop("disabled", false);
 }
 </script>

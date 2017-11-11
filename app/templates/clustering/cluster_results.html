@@ -1,10 +1,10 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
-
 <div>
+    <div><button id="switch-tweets">Switch tweets</button></div>
     <table class="table table-striped table-bordered table-hover">
             {% for key, value in tweets.iteritems() %}
             <tr>
-                <th id="group_{{key}}">{% if group_names[key] %} {{group_names[key]}} {% else %}Group {{key}}{% endif %}<button onclick="changeGroupName('{{key}}', '{{group_names[key]}}')">Change</button>  <button onclick="deleteGroup('{{key}}')">Delete</button>  <button onclick="mergeGroup('{{key}}')">Merge</button></th> 
+                <th id="group_{{key}}">{% if group_names[key] %} {{group_names[key]}} {% else %}Group {{key}}{% endif %}<button onclick="changeGroupName('{{key}}', '{{group_names[key]}}')">Change</button>  <button onclick="deleteGroup({{key}})">Delete</button>  <button onclick="mergeGroup('{{key}}')">Merge</button></th> 
             </tr>
               {% for val in value %}
                 <tr>
@@ -17,6 +17,21 @@
 </div>
 
 <script type="text/javascript">
+
+$("#switch-tweets").click(function() {
+  $.ajax({
+            url: '/clustering/switch_tweet_view',
+            contentType: 'application/json; charset=UTF-8',
+            type: 'GET',
+            dataType: "html",
+            success: function(response) {
+              $("#cluster-results").html(response);
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        });
+});
 
 function chooseClassifier() {
   {% if group_names|length != tweets|length %}
@@ -34,7 +49,7 @@ function chooseClassifier() {
 function move(index, key) {
   var td_id = "#move_" + index + "_" + key;
   var cancel_elem = "<button onclick=\"cancelMove(" + index + ", " + key + ")\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmMove(" + index + ", " + key + ")\">OK</button>";
+  var ok_elem = "<button onclick=\"confirmMove(" + index + ", " + key + ", '')\">OK</button>";
   $(td_id).empty();
   $(td_id).append(getSelect(index, key));
   $(td_id).append(ok_elem);
@@ -89,9 +104,18 @@ function mergeGroup(key) {
   $(td_id).append(cancel_elem);
 }
 
-function confirmMove(index, key) {
+function confirmMove(index, key, desired_key) {
   var select_id = "#select_" + index + "_" + key;
-  var desired_key = $(select_id).find(":selected").val();
+  if (desired_key == '') {
+    desired_key = $(select_id).find(":selected").val();
+  } 
+  if (desired_key == "new_group") {
+      createNewGroup(index, key);
+      return;
+  }
+  if (desired_key == 'Created new') {
+      desired_key = $("#input-" + index).val();
+  }
   $.ajax({
             url: '/clustering/move_to_cluster',
             data: JSON.stringify({desired_key: desired_key, key: key, index: index}),
@@ -212,6 +236,17 @@ function changeGroupName(groupKey, previousName) {
   $(th_id).append(cancel_elem);
 }
 
+function createNewGroup(index, key) {
+  var td_id = "#move_" + index + "_" + key;
+  var cancel_elem = "<button onclick=\"move(" + index + ", '" + key + "')\">Cancel</button>";
+  var ok_elem = "<button onclick=\"confirmMove(" + index + ", '" + key + "', 'Created new')\">OK</button>";
+  var group_name = "<input id=\"input-" + index + "\" type=\"text\" placeholder=\"New group\"/>";
+  $(td_id).empty();
+  $(td_id).append(group_name);
+  $(td_id).append(ok_elem);
+  $(td_id).append(cancel_elem);
+}
+
 function getSelect(index, key) {
   var select = "";
   if (index != "") {
@@ -226,6 +261,7 @@ function getSelect(index, key) {
       select += "<option value=\"{{key_val}}\">{% if group_names[key_val] %} {{group_names[key_val]}} {% else %}G {{key_val}}{% endif %}</option>";
     }
   {% endfor %}
+  select += "<option value='new_group'>New group</option>";
   select += "</select>";
   return select;
 }
