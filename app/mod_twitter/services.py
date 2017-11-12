@@ -1,4 +1,7 @@
 from __future__ import print_function
+import tweepy
+from config import BASE_DIR, APP_STATIC, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
+from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
 
@@ -132,3 +135,14 @@ class TweetPreprocessor():
              for line in f:
                 line_parts = re.split(r'\t+', line)
                 self.acronym_map[line_parts[0]] = line_parts[1]
+
+def process_hashtag(hashtag):
+    if "#" not in hashtag:
+        hashtag = "#" + hashtag
+    if " " in hashtag: #a user has entered white spaces
+        hashtag = hashtag.replace(" ", "")
+    return hashtag
+
+def process(tweet, hashtag):
+    preprocessed_tweet = TweetPreprocessor(tweet.text, hashtag).perform_preprocessing()
+    return preprocessed_tweet

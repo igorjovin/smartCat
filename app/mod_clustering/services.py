@@ -1,6 +1,4 @@
 from __future__ import print_function
-from tweepy import Stream
-from tweepy.streaming import StreamListener
 
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.decomposition import TruncatedSVD
@@ -20,7 +18,11 @@ import logging
 import sys
 from time import time
 import os
-from config import BASE_DIR, APP_STATIC
+from tweepy import OAuthHandler
+from tweepy import Stream
+from collections import defaultdict
+from config import BASE_DIR, APP_STATIC, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
+import app.mod_twitter.services as twitter_service
 
 class TwitterKMeans():
 
@@ -51,3 +53,5 @@ class TwitterKMeans():
             original_tweets_with_groups[str(i)].append(original_tweets[j])
             j = j + 1
         return preprocessed_tweets_with_groups, original_tweets_with_groups
+
+

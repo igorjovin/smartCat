@@ -13,7 +13,7 @@
 
 <div>
   <div>
-    <legend>Training complete. Proceed to classification of new tweets by entering a hashtag below.</legend>
+    <legend>Classify tweets by entering a hashtag below.</legend>
     {% with errors = get_flashed_messages(category_filter=["error"]) %}
     {% if errors %}
     <div>
@@ -40,39 +40,21 @@
       <div>
       </div>
       <button id="submit_search" type="submit" name="submit">Submit</button>
-      <select id="select-classifier">
-        <option value='XGBoost' selected>XGBoost</option>
-        <option value='SVC' selected>SVM (SVC)</option>
-        <option value='NaiveBayes' selected>Naive Bayes</option>
-        <option value='RandomForest' selected>Random Forest</option>
-        <option value='LinearRegression' selected>Linear Regression</option>
-      </select>
     </div>  
   </div>
 </div>
 
 <div id="please-wait" style="display:none">Please wait...</div>
-<button id="retrain" onclick="retrain()">Retrain</button>
-<button id="home">Home</button>
-<button id="cross-validate">Cross validate</button>
+
 <div id="predictions"></div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
-
-$("#home").click(function() {
-  location.href = "/twitter/index/";
-});
-
-$("#cross-validate").click(function() {
-  location.href = "/classification/cross-validation";
-});
-
 $("#submit_search").click(function() {
   disableForm();
   $.ajax({
-            url: '/classification/predict/',
-            data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: $("#select-classifier").find(":selected").text()}),
+            url: '/classification/predict-user/',
+            data: JSON.stringify({hashtag: $("#hashtag").val()}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',
             dataType: "html",
@@ -86,10 +68,10 @@ $("#submit_search").click(function() {
         });
 });
 
-function retrain() {
-  $.ajax({
+window.addEventListener("beforeunload", function (e) {
+    $.ajax({
             url: '/classification/retrain/',
-            data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: $("#select-classifier").find(":selected").text()}),
+            data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: ""}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',
             dataType: "html",
@@ -101,7 +83,7 @@ function retrain() {
                 console.log(error);
             }
         });
-}
+});
 
 function disableForm() {
   $("#please-wait").show();

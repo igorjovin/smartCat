@@ -14,3 +14,8 @@ def index():
 def index_admin():
     form = IndexForm(request.form)
     return render_template("twitter/index_admin.html", form=form)
+
+@mod_twitter.route('/index-user/', methods=['GET'])
+def index_user():
+    form = IndexForm(request.form)
+    return render_template("twitter/index_user.html", form=form)

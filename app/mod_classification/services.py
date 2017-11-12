@@ -1,6 +1,10 @@
 from __future__ import print_function
+import tweepy
+from config import BASE_DIR, APP_STATIC, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
+from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
+import app.mod_twitter.services as twitter_service
 
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -24,6 +28,7 @@ import xgboost as xgb
 import re
 import logging
 import sys
+import csv
 import numpy as np
 from time import time
 import os
@@ -32,7 +37,7 @@ from config import BASE_DIR, APP_STATIC
 class TweetClassifier():
 
     classifier_name = ""
-    classifier = MultinomialNB()#SVC()
+    classifier = MultinomialNB()
     vectorizer = CountVectorizer()#TfidfVectorizer(min_df=2,
                              #max_df = 0.8,
                              #sublinear_tf=True)
@@ -58,22 +63,25 @@ class TweetClassifier():
         y = dataset['label'].tolist()
         X = dataset['tweet'].tolist()
         X = self.vectorizer.fit_transform(X)
-        #X = sp.hstack((X, sp.csr_matrix(np.ones((X.shape[0], 1)))))
+
         self.classifier.fit(X, y)
         self.save_classifier(hashtag)
+        return True
 
-    def predict(self, tweets, hashtag):
+    def predict(self, preprocessed_tweets, original_tweets, hashtag):
         loaded_classifier = self.load_classifier(hashtag)
         if not loaded_classifier:
             return None
-        tweets_vectorized = self.vectorizer.transform(tweets)
+        tweets_vectorized = self.vectorizer.transform(preprocessed_tweets)
         predictions = self.classifier.predict(tweets_vectorized)
-        tweets_with_predictions = defaultdict(list)
+        preprocessed_tweets_with_predictions = defaultdict(list)
+        original_tweets_with_predictions = defaultdict(list)
         j = 0
         for i in predictions:
-            tweets_with_predictions[i].append(tweets[j])
+            preprocessed_tweets_with_predictions[i].append(preprocessed_tweets[j])
+            original_tweets_with_predictions[i].append(original_tweets[j])
             j = j + 1
-        return tweets_with_predictions
+        return preprocessed_tweets_with_predictions, original_tweets_with_predictions
 
     def cross_validate(self, hashtag):
         dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
@@ -121,8 +129,147 @@ class TweetClassifier():
             return True
         return False
 
+    def write_cluster_tweets_to_dataset_csv(self, class_names, clustered_tweets):
+        f = open(self.get_dataset_csv_file_path(hashtag), "a")
+        cw = csv.writer(f)
+        for label, value in clustered_tweets.iteritems():
+            for item in value:
+                cw.writerow([str(class_names[label]), str(item.encode('utf-8'))])
+        f.close()
+
+    def write_to_dataset_csv(self, hashtag, tweets_with_predictions):
+        tweets_to_append = self.get_tweets_to_append(hashtag, tweets_with_predictions)
+        f = open(self.get_dataset_csv_file_path(hashtag), "a")
+        cw = csv.writer(f)
+        for label, value in tweets_to_append.iteritems():
+            for item in value:
+                cw.writerow([str(label), str(item.encode('utf-8'))])
+        f.close()
+
+    def get_tweets_to_append(self, hashtag, tweets_with_predictions):
+        file_path = self.get_dataset_csv_file_path(hashtag)
+        existing_tweets = pd.read_csv(file_path, header=None, names=["label", "tweet"])
+        existing_tweet_list = existing_tweets["tweet"].tolist()
+        new_tweets_with_predictions = defaultdict(list)
+        for label, value in tweets_with_predictions.iteritems():
+            for item in value:
+                if item not in existing_tweet_list:
+                    new_tweets_with_predictions[label].append(item)
+        return new_tweets_with_predictions    
+
+    def get_dataset_csv_file_path(self, hashtag):
+        file_name = 'dataset-' + hashtag + '.csv'
+        return os.path.join(os.path.join(APP_STATIC, file_name))
+
     def is_regression(self):
         return self.classifier_name == "Linear Regression" or self.classifier_name == "SVR"
+
+classifier = TweetClassifier("Naive Bayes")
+original_tweets_with_predictions = defaultdict(list)
+preprocessed_tweets_with_predictions = defaultdict(list)
+class_names = {}
+class_list = list()
+hashtag = ""
+showing_original_tweets = True
+
+auth = OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
+auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
+api = tweepy.API(auth)#, proxy="http://proxy.uns.ac.rs:8080")
+
+def select_classifier(classifier_name):
+    global classifier
+    classifier = TweetClassifier(classifier_name)
+
+def train_classifier(preprocessed_tweets_with_clusters, cluster_names, cluster_hashtag):
+    global class_names
+    global classifier
+    class_names = cluster_names
+    classifier.write_cluster_tweets_to_dataset_csv(class_names, preprocessed_tweets_with_clusters)
+    classifier.classify(cluster_hashtag)
+
+def retrain_classifier(hashtag, classifier_name):
+    global classifier
+    global preprocessed_tweets_with_predictions
+    classifier = TweetClassifier(classifier_name)
+    classifier.write_to_dataset_csv(hashtag, preprocessed_tweets_with_predictions)
+    classifier.classify(hashtag)
+
+def predict(hashtag, classifier_name):
+    global classifier
+    global preprocessed_tweets_with_predictions
+    global class_list
+    global showing_original_tweets
+    showing_original_tweets = True
+    preprocessed_tweets_with_predictions = defaultdict(list)
+    original_tweets_with_predictions = defaultdict(list)
+    preprocessed_tweets = list()
+    original_tweets = list()
+    hashtag = twitter_service.process_hashtag(hashtag)
+    for tweet in tweepy.Cursor(api.search, q=hashtag, lang="en").items(100):
+        tweet_text = twitter_service.process(tweet, hashtag)
+        if tweet_text not in preprocessed_tweets:
+           preprocessed_tweets.append(tweet_text)
+           original_tweets.append(tweet.text)
+
+    classifier = TweetClassifier(classifier_name)
+    preprocessed_tweets_with_predictions, original_tweets_with_predictions = classifier.predict(preprocessed_tweets, original_tweets, hashtag)
+    if preprocessed_tweets_with_predictions is None:
+        message = "There is no classifier " + classifier_name
+        print(message)
+    else:
+        class_list = list(preprocessed_tweets_with_predictions.keys())
+    return preprocessed_tweets_with_predictions#get_tweets_to_show()
+
+def cross_validate(hashtag, classifier_name):
+    hashtag = twitter_service.process_hashtag(hashtag)
+    classifier = TweetClassifier(classifier_name)
+    accuracy, f1 = classifier.cross_validate(hashtag)
+    accuracy = round(accuracy * 100.0, 2)
+    f1 = round(f1 * 100.0, 2)
+    return accuracy, f1
+
+def move_tweet_to_class(key, desired_key, tweet_index):
+    global preprocessed_tweets_with_predictions
+    global class_list
+    if desired_key not in class_list:
+        class_list.append(desired_key)
+    tweet = preprocessed_tweets_with_predictions[key][tweet_index]
+    del preprocessed_tweets_with_predictions[key][tweet_index]
+    preprocessed_tweets_with_predictions[desired_key].append(tweet)
+    return preprocessed_tweets_with_predictions#get_tweets_to_show()
+
+def remove_tweet_from_class(key, tweet_index):
+    global preprocessed_tweets_with_predictions
+    global class_names
+    tweet = preprocessed_tweets_with_predictions[key][tweet_index]
+    del preprocessed_tweets_with_predictions[key][tweet_index]
+    return preprocessed_tweets_with_predictions#get_tweets_to_show()
+
+def create_new_class(desired_name):
+    global class_names
+    class_names[len(class_names)] = desired_name
+
+def switch_tweet_view():
+    global preprocessed_tweets_with_predictions
+    global original_tweets_with_predictions
+    global showing_original_tweets
+    if showing_original_tweets:
+        showing_original_tweets = False
+        return preprocessed_tweets_with_predictions
+    else:
+        showing_original_tweets = True
+        return original_tweets_with_predictions
+    return tweets_to_show
+
+def get_tweets_to_show():
+    global preprocessed_tweets_with_predictions
+    global original_tweets_with_predictions
+    global showing_original_tweets
+    if showing_original_tweets:
+        return original_tweets_with_predictions
+    else:
+        return preprocessed_tweets_with_predictions
+
 
 
 

@@ -215,7 +215,6 @@ def cluster_results():
     session['preprocessed_tweets_with_groups'] = preprocessed_tweets_with_groups
     session['hashtag'] = hashtag
     session['group_names'] = group_names
-    print("HASHTAG IN SESSION " + session['hashtag'])
 
     return render_template("clustering/cluster_results.html", form=form, tweets=tweets_to_show, group_names = group_names)
 
