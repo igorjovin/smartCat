@@ -30,6 +30,7 @@ import logging
 import sys
 import csv
 import numpy as np
+import logging
 from time import time
 import os
 from config import BASE_DIR, APP_STATIC
@@ -106,6 +107,18 @@ class TweetClassifier():
         f1 = f1_score(test_y, y_pred, average='weighted')  
         return accuracy, f1
 
+    def classifier_exists(self, hashtag):
+        classifier_file_name = "classifier-" + hashtag + "-" + self.classifier_name.replace(" ", "") + ".pickle"    
+        if os.path.isfile(os.path.join(APP_STATIC, classifier_file_name)):
+            try:
+                with open(os.path.join(APP_STATIC, classifier_file_name), 'rb') as f:
+                    return True
+            except IOError:
+                logging.warning('Unable to write to load classifier/vectorizer with name %s.' % classifier_file_name)
+                return False
+        logging.warning("No classifier with name %s " % classifier_file_name)
+        return False
+
     def save_classifier(self, hashtag):
         classifier_file_name = "classifier-" + hashtag + "-" + self.classifier_name.replace(" ", "") + ".pickle"
         f = open(os.path.join(APP_STATIC, classifier_file_name), 'wb')
@@ -120,31 +133,49 @@ class TweetClassifier():
         classifier_file_name = "classifier-" + hashtag + "-" + self.classifier_name.replace(" ", "") + ".pickle"    
         vectorizer_file_name = "vectorizer-" + hashtag + "-" + self.classifier_name.replace(" ", "") + ".pickle"
         if os.path.isfile(os.path.join(APP_STATIC, classifier_file_name)):
-            f = open(os.path.join(APP_STATIC, classifier_file_name), 'rb')
-            self.classifier = pickle.load(f)
-            f.close()
-            f = open(os.path.join(APP_STATIC, vectorizer_file_name), 'rb')
-            self.vectorizer = pickle.load(f)
-            f.close()
+            try:
+                with open(os.path.join(APP_STATIC, classifier_file_name), 'rb') as f:
+                    self.classifier = pickle.load(f)
+                    f.close()
+            except IOError:
+                return False
+            try: 
+                with open(os.path.join(APP_STATIC, vectorizer_file_name), 'rb') as f:
+                    self.vectorizer = pickle.load(f)
+                    f.close()
+            except IOError:
+                logging.warning('Unable to write to load classifier/vectorizer with name %s.' % hashtag + "-" + self.classifier_name.replace(" ", ""))
+                return False   
             return True
+        logging.warning("No classifier with name %s " % hashtag + "-" + self.classifier_name.replace(" ", ""))
         return False
 
-    def write_cluster_tweets_to_dataset_csv(self, class_names, clustered_tweets):
-        f = open(self.get_dataset_csv_file_path(hashtag), "a")
-        cw = csv.writer(f)
-        for label, value in clustered_tweets.iteritems():
-            for item in value:
-                cw.writerow([str(class_names[label]), str(item.encode('utf-8'))])
-        f.close()
+    def write_cluster_tweets_to_dataset_csv(self, hashtag, class_names, clustered_tweets):
+        try:
+            csv_file_name = self.get_dataset_csv_file_path(hashtag)
+            with open(os.path.join(APP_STATIC, vectorizer_file_name), 'a') as f:
+                cw = csv.writer(f)
+                for label, value in clustered_tweets.iteritems():
+                    for item in value:
+                        cw.writerow([str(class_names[label]), str(item.encode('utf-8'))])
+                f.close()
+                return True
+        except IOError:
+            logging.warning('Unable to write to CSV dataset.')
+            return False
 
     def write_to_dataset_csv(self, hashtag, tweets_with_predictions):
         tweets_to_append = self.get_tweets_to_append(hashtag, tweets_with_predictions)
-        f = open(self.get_dataset_csv_file_path(hashtag), "a")
-        cw = csv.writer(f)
-        for label, value in tweets_to_append.iteritems():
-            for item in value:
-                cw.writerow([str(label), str(item.encode('utf-8'))])
-        f.close()
+        csv_file_name = self.get_dataset_csv_file_path(hashtag)
+        try:
+            with open(self.get_dataset_csv_file_path(hashtag), "a") as f:
+                cw = csv.writer(f)
+                for label, value in tweets_to_append.iteritems():
+                    for item in value:
+                        cw.writerow([str(label), str(item.encode('utf-8'))])
+                f.close()
+        except IOError:
+            logging.warning('No CSV file with name %s .' % csv_file_name)
 
     def get_tweets_to_append(self, hashtag, tweets_with_predictions):
         file_path = self.get_dataset_csv_file_path(hashtag)
@@ -184,7 +215,7 @@ def train_classifier(preprocessed_tweets_with_clusters, cluster_names, cluster_h
     global class_names
     global classifier
     class_names = cluster_names
-    classifier.write_cluster_tweets_to_dataset_csv(class_names, preprocessed_tweets_with_clusters)
+    classifier.write_cluster_tweets_to_dataset_csv(cluster_hashtag, class_names, preprocessed_tweets_with_clusters)
     classifier.classify(cluster_hashtag)
 
 def retrain_classifier(hashtag, classifier_name):
@@ -204,14 +235,15 @@ def predict(hashtag, classifier_name):
     original_tweets_with_predictions = defaultdict(list)
     preprocessed_tweets = list()
     original_tweets = list()
+    classifier = TweetClassifier(classifier_name)
+    if not classifier.classifier_exists(hashtag):
+        return {}
     hashtag = twitter_service.process_hashtag(hashtag)
     for tweet in tweepy.Cursor(api.search, q=hashtag, lang="en").items(100):
         tweet_text = twitter_service.process(tweet, hashtag)
         if tweet_text not in preprocessed_tweets:
            preprocessed_tweets.append(tweet_text)
            original_tweets.append(tweet.text)
-
-    classifier = TweetClassifier(classifier_name)
     preprocessed_tweets_with_predictions, original_tweets_with_predictions = classifier.predict(preprocessed_tweets, original_tweets, hashtag)
     if preprocessed_tweets_with_predictions is None:
         message = "There is no classifier " + classifier_name

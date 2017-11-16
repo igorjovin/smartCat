@@ -8,7 +8,7 @@
             </tr>
               {% for val in value %}
                 <tr>
-                    <td>{{val}}</td> <td id="move_{{loop.index}}_{{key}}"><button onclick="move({{loop.index}}, '{{key}}')">Move</button>  <button onclick="remove({{loop.index}}, '{{key}}')">Remove</button></td>
+                    <td>{{val}}</td> <td id="move_{{loop.index}}_{{key}}"><button onclick="move({{loop.index}}, '{{key}}', false)">Move</button> <button onclick="move({{loop.index}}, '{{key}}', true)">Copy</button> <button onclick="remove({{loop.index}}, '{{key}}')">Remove</button></td>
                 </tr>
               {% endfor %}
             {% endfor %}
@@ -46,10 +46,10 @@ function chooseClassifier() {
   $("#training-buttons").append(cancel_elem);
 }
 
-function move(index, key) {
+function move(index, key, isCopy) {
   var td_id = "#move_" + index + "_" + key;
-  var cancel_elem = "<button onclick=\"cancelMove(" + index + ", " + key + ")\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmMove(" + index + ", " + key + ", '')\">OK</button>";
+  var cancel_elem = "<button onclick=\"cancelMove(" + index + ", " + key + "\">Cancel</button>";
+  var ok_elem = "<button onclick=\"confirmMove(" + index + ", " + key + ", '', " + isCopy + ")\">OK</button>";
   $(td_id).empty();
   $(td_id).append(getSelect(index, key));
   $(td_id).append(ok_elem);
@@ -104,7 +104,7 @@ function mergeGroup(key) {
   $(td_id).append(cancel_elem);
 }
 
-function confirmMove(index, key, desired_key) {
+function confirmMove(index, key, desired_key, is_copy) {
   var select_id = "#select_" + index + "_" + key;
   if (desired_key == '') {
     desired_key = $(select_id).find(":selected").val();
@@ -118,7 +118,7 @@ function confirmMove(index, key, desired_key) {
   }
   $.ajax({
             url: '/clustering/move_to_cluster',
-            data: JSON.stringify({desired_key: desired_key, key: key, index: index}),
+            data: JSON.stringify({desired_key: desired_key, key: key, index: index, is_copy: is_copy}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',
             dataType: "html",
@@ -156,7 +156,7 @@ function confirmChangeGroupName(groupKey) {
       return;
   }
   $.ajax({
-            url: '/clustering/change_group_name',
+            url: '/clustering/change_cluster_name',
             data: JSON.stringify({desired_name: desired_name, key: groupKey}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',
@@ -188,10 +188,11 @@ function confirmClassifier() {
         });
 }
 
-function cancelMove(index, key) {
+function cancelMove(index, key, isCopy) {
   var td_id = "#move_" + index + "_" + key;
   $(td_id).empty();
-  $(td_id).append("<button onclick='move(" + index + ", " + key + ")'>Move</button>");
+  $(td_id).append("<button onclick='move(" + index + ", " + key + ", false)'>Move</button>");
+  $(td_id).append("<button onclick='move(" + index + ", " + key + ", true)'>Copy</button>");
   $(td_id).append("<button onclick='remove(" + index + ", " + key + ")'>Remove</button>");
 }
 
