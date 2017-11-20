@@ -10,7 +10,7 @@
     {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
 </div>
 {% endmacro %}
-
+<div><button onclick="logOut()">Log out</button></div>
 <div>
   <div>
     <legend>Classify tweets by entering a hashtag below.</legend>
@@ -37,8 +37,7 @@
       {{ form.csrf_token }}
       {{ render_field(form.hashtag, placeholder="Enter a hashtag",
                                   autofocus="") }}
-      <div>
-      </div>
+      <div id="classes"></div>
       <button id="submit_search" type="submit" name="submit">Submit</button>
     </div>  
   </div>
@@ -50,17 +49,31 @@
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
+function logOut(){
+  $.ajax({
+        url: '/classification/logout',
+        type: 'GET',
+        dataType: "html",
+        success: function(response) {
+          location.href = "/twitter/index/"
+        },
+        error: function(error) {
+            console.log(error);
+        }
+  });
+}
+
 $("#submit_search").click(function() {
   disableForm();
   $.ajax({
-            url: '/classification/predict-user/',
+            url: '/classification/prediction-classes/',
             data: JSON.stringify({hashtag: $("#hashtag").val()}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',
             dataType: "html",
             success: function(response) {
               enableForm();
-              $("#predictions").html(response);
+              $("#classes").html(response);
             },
             error: function(error) {
                 console.log(error);
@@ -95,5 +108,27 @@ function enableForm() {
   $("#please-wait").hide();
   $("#hashtag").prop("disabled", false);
   $("#submit_search").prop("disabled", false);
+}
+
+function predict() {
+  disableForm();
+  var filter_classes = [];
+  $('.btn-cl:disabled').each(function(){
+    filter_classes.push($(this).text());
+  });
+  $.ajax({
+        url: '/classification/predict-user/',
+        data: JSON.stringify({hashtag: $("#hashtag").val(), filter_classes: filter_classes}),
+        contentType: 'application/json; charset=UTF-8',
+        type: 'POST',
+        dataType: "html",
+        success: function(response) {
+          enableForm();
+          $("#predictions").html(response);
+        },
+        error: function(error) {
+            console.log(error);
+        }
+  });
 }
 </script>

@@ -2,14 +2,13 @@ from __future__ import print_function
 import tweepy
 from config import BASE_DIR, APP_STATIC, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
 from tweepy import OAuthHandler
-from tweepy import Stream
-from tweepy.streaming import StreamListener
 import app.mod_twitter.services as twitter_service
 
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
 from sklearn import metrics
@@ -20,6 +19,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import MultiLabelBinarizer
 from collections import defaultdict
 import pandas as pd
 import nltk
@@ -46,7 +46,7 @@ class TweetClassifier():
     def __init__(self, classifier_name):
         self.classifier_name = classifier_name
         if classifier_name == "Naive Bayes":
-            self.classifier = MultinomialNB()
+            self.classifier = OneVsRestClassifier(MultinomialNB())
         if classifier_name == "SVC":
             self.classifier = SVC(C = 30)
         if classifier_name == "SVR":
@@ -62,6 +62,12 @@ class TweetClassifier():
         dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
             header=None, names=['label','tweet'])
         y = dataset['label'].tolist()
+        for i, label in enumerate(y):
+            if ";" in label:
+                y[i] = [ single_label.strip() for single_label in label.split(";") if single_label.strip() ]
+        class_list = self.load_classes(hashtag)
+        multi_label_binarizer = MultiLabelBinarizer(classes=list(class_list))
+        y = multi_label_binarizer.fit_transform(y)
         X = dataset['tweet'].tolist()
         X = self.vectorizer.fit_transform(X)
 
@@ -69,20 +75,31 @@ class TweetClassifier():
         self.save_classifier(hashtag)
         return True
 
-    def predict(self, preprocessed_tweets, original_tweets, hashtag):
+    def predict(self, preprocessed_tweets, original_tweets, hashtag, offset):
         loaded_classifier = self.load_classifier(hashtag)
         if not loaded_classifier:
             return None
         tweets_vectorized = self.vectorizer.transform(preprocessed_tweets)
         predictions = self.classifier.predict(tweets_vectorized)
-        preprocessed_tweets_with_predictions = defaultdict(list)
-        original_tweets_with_predictions = defaultdict(list)
-        j = 0
+        tweets_with_predictions = defaultdict(list)
+        indexes_with_preprocessed_tweets = dict()
+        indexes_with_original_tweets = dict()
+        classes = self.load_classes(hashtag)
+        j = offset
+        print("OFFSET %d" % offset)
         for i in predictions:
-            preprocessed_tweets_with_predictions[i].append(preprocessed_tweets[j])
-            original_tweets_with_predictions[i].append(original_tweets[j])
-            j = j + 1
-        return preprocessed_tweets_with_predictions, original_tweets_with_predictions
+            contains_1 = False
+            for index, single_prediction in enumerate(i):
+                print("PREDICT %d " % single_prediction)
+                if single_prediction == 1:
+                    contains_1 = True
+                    tweets_with_predictions[j].append(classes[index])
+            if contains_1:
+                indexes_with_preprocessed_tweets[j] = preprocessed_tweets[j-offset]
+                print("PREPROC TWEET %d, %s" % (j-offset, preprocessed_tweets[j-offset]))
+                indexes_with_original_tweets[j] = original_tweets[j-offset]
+                j = j + 1
+        return classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets
 
     def cross_validate(self, hashtag):
         dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
@@ -153,40 +170,78 @@ class TweetClassifier():
     def write_cluster_tweets_to_dataset_csv(self, hashtag, class_names, clustered_tweets):
         try:
             csv_file_name = self.get_dataset_csv_file_path(hashtag)
-            with open(os.path.join(APP_STATIC, vectorizer_file_name), 'a') as f:
+            with open(os.path.join(APP_STATIC, csv_file_name), 'a') as f:
                 cw = csv.writer(f)
-                for label, value in clustered_tweets.iteritems():
+                indexes_with_tweets = dict()
+                indexes_with_clusters = defaultdict(list)
+                all_tweets = list()
+                i = 0
+                for label, value in clustered_tweets.iteritems(): #for each tweet write a tuple of classes it's in
                     for item in value:
-                        cw.writerow([str(class_names[label]), str(item.encode('utf-8'))])
+                        if item in all_tweets:
+                            ind = all_tweets.index(item)
+                            indexes_with_clusters[ind].append(label)
+                        else:
+                            all_tweets.append(item)
+                            indexes_with_tweets[i] = item
+                            indexes_with_clusters[i].append(label)
+                            i += 1
+
+                for index, val in indexes_with_tweets.iteritems():
+                    label = ""
+                    for cl in indexes_with_clusters[index]:
+                        label += str(class_names[cl]) + ";"
+                    cw.writerow([str(label), str(val.encode('utf-8'))])
                 f.close()
                 return True
         except IOError:
             logging.warning('Unable to write to CSV dataset.')
             return False
 
-    def write_to_dataset_csv(self, hashtag, tweets_with_predictions):
-        tweets_to_append = self.get_tweets_to_append(hashtag, tweets_with_predictions)
+    def write_to_dataset_csv(self, hashtag, indexes_with_tweets, tweets_with_predictions):
+        tweets_with_predictions_to_append, indexes_with_tweets_to_append = self.get_tweets_to_append(hashtag, indexes_with_tweets, tweets_with_predictions)
         csv_file_name = self.get_dataset_csv_file_path(hashtag)
         try:
             with open(self.get_dataset_csv_file_path(hashtag), "a") as f:
                 cw = csv.writer(f)
-                for label, value in tweets_to_append.iteritems():
-                    for item in value:
-                        cw.writerow([str(label), str(item.encode('utf-8'))])
+                for index, value in indexes_with_tweets_to_append.iteritems():
+                    label = ""
+                    for cl in tweets_with_predictions[index]:
+                        label += cl + ";"
+                    cw.writerow([str(label), str(value.encode('utf-8'))])
                 f.close()
         except IOError:
             logging.warning('No CSV file with name %s .' % csv_file_name)
 
-    def get_tweets_to_append(self, hashtag, tweets_with_predictions):
+    def load_classes(self, hashtag):
+        class_list = list()
+        dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
+            header=None, names=['label','tweet'])
+        y = dataset['label'].tolist()
+        for i, label in enumerate(y):
+            if ";" in label:
+                for single_label in label.split(";"):
+                    if single_label.strip() not in class_list and single_label.strip() != "":
+                        class_list.append(single_label.strip())
+            else:
+                if label.strip() not in class_list and label.strip() != "":
+                    class_list.append(label.strip())
+        return class_list
+
+    def get_tweets_to_append(self, hashtag, indexes_with_tweets, tweets_with_predictions):
         file_path = self.get_dataset_csv_file_path(hashtag)
         existing_tweets = pd.read_csv(file_path, header=None, names=["label", "tweet"])
         existing_tweet_list = existing_tweets["tweet"].tolist()
-        new_tweets_with_predictions = defaultdict(list)
-        for label, value in tweets_with_predictions.iteritems():
-            for item in value:
-                if item not in existing_tweet_list:
-                    new_tweets_with_predictions[label].append(item)
-        return new_tweets_with_predictions    
+        new_indexes_with_tweets = dict()
+        new_tweets_with_predictions = dict()
+        i = 0
+        for index, value in indexes_with_tweets.iteritems():
+            if value not in existing_tweet_list:
+                if tweets_with_predictions[index]: #if there are any tags associated with the tweet
+                    new_indexes_with_tweets[i] = value
+                    new_tweets_with_predictions[i] = tweets_with_predictions[index]
+                    i += 1
+        return new_tweets_with_predictions, new_indexes_with_tweets    
 
     def get_dataset_csv_file_path(self, hashtag):
         file_name = 'dataset-' + hashtag + '.csv'
@@ -196,10 +251,11 @@ class TweetClassifier():
         return self.classifier_name == "Linear Regression" or self.classifier_name == "SVR"
 
 classifier = TweetClassifier("Naive Bayes")
-original_tweets_with_predictions = defaultdict(list)
-preprocessed_tweets_with_predictions = defaultdict(list)
+tweets_with_predictions = defaultdict(list) #key = index of tweet; value = list of classes
+indexes_with_preprocessed_tweets = dict() #key = index of tweet; value = tweet text
+indexes_with_original_tweets = dict()
 class_names = {}
-class_list = list()
+classes = set()
 hashtag = ""
 showing_original_tweets = True
 
@@ -222,35 +278,30 @@ def retrain_classifier(hashtag, classifier_name):
     global classifier
     global preprocessed_tweets_with_predictions
     classifier = TweetClassifier(classifier_name)
-    classifier.write_to_dataset_csv(hashtag, preprocessed_tweets_with_predictions)
+    #classifier.write_to_dataset_csv(hashtag, preprocessed_tweets_with_predictions)
     classifier.classify(hashtag)
 
-def predict(hashtag, classifier_name):
+def predict(hashtag, classifier_name, items_per_page, offset, filter_classes): #ovo treba da bude sakupljanje tvitova
     global classifier
-    global preprocessed_tweets_with_predictions
-    global class_list
+    global tweets_with_predictions
+    global indexes_with_original_tweets
+    global indexes_with_preprocessed_tweets
+    global classes
     global showing_original_tweets
     showing_original_tweets = True
-    preprocessed_tweets_with_predictions = defaultdict(list)
-    original_tweets_with_predictions = defaultdict(list)
+    tweets_with_predictions = defaultdict(list)
+    indexes_with_original_tweets = dict()
+    indexes_with_preprocessed_tweets = dict()
     preprocessed_tweets = list()
     original_tweets = list()
     classifier = TweetClassifier(classifier_name)
     if not classifier.classifier_exists(hashtag):
         return {}
-    hashtag = twitter_service.process_hashtag(hashtag)
-    for tweet in tweepy.Cursor(api.search, q=hashtag, lang="en").items(100):
-        tweet_text = twitter_service.process(tweet, hashtag)
-        if tweet_text not in preprocessed_tweets:
-           preprocessed_tweets.append(tweet_text)
-           original_tweets.append(tweet.text)
-    preprocessed_tweets_with_predictions, original_tweets_with_predictions = classifier.predict(preprocessed_tweets, original_tweets, hashtag)
-    if preprocessed_tweets_with_predictions is None:
-        message = "There is no classifier " + classifier_name
-        print(message)
-    else:
-        class_list = list(preprocessed_tweets_with_predictions.keys())
-    return preprocessed_tweets_with_predictions#get_tweets_to_show()
+    preprocessed_tweets, original_tweets = twitter_service.get_tweets_from_api(hashtag, items_per_page)
+    classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets = classifier.predict(preprocessed_tweets, original_tweets, hashtag, offset)
+    if filter_classes is not None and filter_classes:
+        tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets = get_tweets_from_filter_classes(filter_classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets)
+    return classes, tweets_with_predictions, indexes_with_preprocessed_tweets#get_tweets_to_show()
 
 def cross_validate(hashtag, classifier_name):
     hashtag = twitter_service.process_hashtag(hashtag)
@@ -260,30 +311,35 @@ def cross_validate(hashtag, classifier_name):
     f1 = round(f1 * 100.0, 2)
     return accuracy, f1
 
-def move_tweet_to_class(key, desired_key, tweet_index):
-    global preprocessed_tweets_with_predictions
-    global class_list
-    if desired_key not in class_list:
-        class_list.append(desired_key)
-    tweet = preprocessed_tweets_with_predictions[key][tweet_index]
-    del preprocessed_tweets_with_predictions[key][tweet_index]
-    preprocessed_tweets_with_predictions[desired_key].append(tweet)
-    return preprocessed_tweets_with_predictions#get_tweets_to_show()
+def add_tag_to_tweet(tweet_index, desired_tag):
+    global tweets_with_predictions
+    global classes
+    if desired_tag not in classes:
+        classes.add(desired_tag)
+    if desired_tag not in tweets_with_predictions[tweet_index]:
+        tweets_with_predictions[tweet_index].append(desired_tag)
+    return classes, tweets_with_predictions, indexes_with_preprocessed_tweets#get_tweets_to_show()
 
-def remove_tweet_from_class(key, tweet_index):
-    global preprocessed_tweets_with_predictions
-    global class_names
-    tweet = preprocessed_tweets_with_predictions[key][tweet_index]
-    del preprocessed_tweets_with_predictions[key][tweet_index]
-    return preprocessed_tweets_with_predictions#get_tweets_to_show()
+def remove_tag_from_tweet(tweet_index, tag):
+    global tweets_with_predictions
+    global classes
+    tweets_with_predictions[tweet_index].remove(tag)
+    return classes, tweets_with_predictions, indexes_with_preprocessed_tweets#get_tweets_to_show()
 
 def create_new_class(desired_name):
-    global class_names
-    class_names[len(class_names)] = desired_name
+    global classes
+    classes.add(desired_name)
+
+def save_to_dataset(hashtag, classifier_name):
+    global classifier
+    global tweets_with_predictions
+    global indexes_with_preprocessed_tweets
+    classifier = TweetClassifier(classifier_name)
+    classifier.write_to_dataset_csv(hashtag, indexes_with_preprocessed_tweets, tweets_with_predictions)
 
 def switch_tweet_view():
-    global preprocessed_tweets_with_predictions
-    global original_tweets_with_predictions
+    global indexes_with_preprocessed_tweets
+    global indexes_with_original_tweets
     global showing_original_tweets
     if showing_original_tweets:
         showing_original_tweets = False
@@ -302,7 +358,36 @@ def get_tweets_to_show():
     else:
         return preprocessed_tweets_with_predictions
 
+def get_tweets_from_filter_classes(filter_classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets):
+    tweets_with_predictions_return = dict()
+    indexes_with_preprocessed_tweets_return = dict()
+    indexes_with_original_tweets_return = dict()
+    for tweet_index, tweet_classes in tweets_with_predictions.iteritems():
+        belongs_to_class = True
+        for filter_cl in filter_classes:
+            if filter_cl not in tweet_classes:
+                belongs_to_class = False
+                break
+        if belongs_to_class:
+            tweets_with_predictions_return[tweet_index] = tweet_classes
+            indexes_with_preprocessed_tweets_return[tweet_index] = indexes_with_preprocessed_tweets[tweet_index]
+            indexes_with_original_tweets_return[tweet_index] = indexes_with_original_tweets[tweet_index]
+    return tweets_with_predictions_return, indexes_with_preprocessed_tweets_return, indexes_with_original_tweets_return
 
+def get_classes_from_dataset(hashtag):
+    class_list = list()
+    dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
+        header=None, names=['label','tweet'])
+    y = dataset['label'].tolist()
+    for i, label in enumerate(y):
+        if ";" in label:
+            for single_label in label.split(";"):
+                if single_label.strip() not in class_list and single_label.strip() != "":
+                    class_list.append(single_label.strip())
+        else:
+            if label.strip() not in class_list and label.strip() != "":
+                class_list.append(label.strip())
+    return class_list
 
 
  

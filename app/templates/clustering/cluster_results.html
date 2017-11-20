@@ -110,7 +110,7 @@ function confirmMove(index, key, desired_key, is_copy) {
     desired_key = $(select_id).find(":selected").val();
   } 
   if (desired_key == "new_group") {
-      createNewGroup(index, key);
+      createNewGroup(index, key, is_copy);
       return;
   }
   if (desired_key == 'Created new') {
@@ -237,10 +237,10 @@ function changeGroupName(groupKey, previousName) {
   $(th_id).append(cancel_elem);
 }
 
-function createNewGroup(index, key) {
+function createNewGroup(index, key, is_copy) {
   var td_id = "#move_" + index + "_" + key;
-  var cancel_elem = "<button onclick=\"move(" + index + ", '" + key + "')\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmMove(" + index + ", '" + key + "', 'Created new')\">OK</button>";
+  var cancel_elem = "<button onclick=\"move(" + index + ", '" + key + "'" + is_copy + ")\">Cancel</button>";
+  var ok_elem = "<button onclick=\"confirmMove(" + index + ", '" + key + "', 'Created new', " + is_copy + ")\">OK</button>";
   var group_name = "<input id=\"input-" + index + "\" type=\"text\" placeholder=\"New group\"/>";
   $(td_id).empty();
   $(td_id).append(group_name);

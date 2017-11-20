@@ -1,0 +1,33 @@
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<div>
+    <div id="cl-all"><button class="btn-cl" id="include-cl-all" onclick="includeClass('all')">All tweets</button></div>
+    {% if classes|length > 0 %}
+      {% for cl in classes %}
+        <div id="cl-{{cl}}"><button class="btn-cl" id="include-cl-{{cl}}" onclick="includeClass('{{cl}}')">{{cl}}</button></div>
+      {% endfor %}
+    {% else %}
+      <p>No classes found.</p>
+    {% endif %}
+</div>
+
+<script type="text/javascript">
+
+function includeClass(className) {
+  var include_id = "#include-cl-" + className;
+  var div_id = "#cl-" + className;
+  if (className != 'all') {
+    $(include_id).prop("disabled", true);
+    $(div_id).append("<button id='exclude-cl-" + className + "' onclick=\"excludeClass('" + className + "')\">X</button>");
+  } 
+  predict();
+}
+
+function excludeClass(className) {
+  var include_id = "#include-cl-" + className;
+  var exclude_id = "#exclude-cl-" + className;
+  $(include_id).prop("disabled", false);
+  $(exclude_id).remove();
+  predict();
+}
+
+</script>

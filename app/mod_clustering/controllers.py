@@ -26,7 +26,6 @@ def move_tweet_to_cluster():
     key = str(request.json['key'])
     desired_key = str(request.json['desired_key'])
     is_copy_str = str(request.json['is_copy'])
-    print("IS COPY " + is_copy_str)
     is_copy = True
     if is_copy_str == "False":
         is_copy = False

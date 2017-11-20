@@ -52,6 +52,7 @@
 
 <div id="please-wait" style="display:none">Please wait...</div>
 <button id="retrain" onclick="retrain()">Retrain</button>
+<button id="retrain" onclick="saveToDataset()">Save to dataset</button>
 <button id="home">Home</button>
 <button id="cross-validate">Cross validate</button>
 <div id="predictions"></div>
@@ -88,6 +89,23 @@ $("#submit_search").click(function() {
 function retrain() {
   $.ajax({
             url: '/classification/retrain/',
+            data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: $("#select-classifier").find(":selected").text()}),
+            contentType: 'application/json; charset=UTF-8',
+            type: 'POST',
+            dataType: "html",
+            success: function(response) {
+              enableForm();
+              location.reload();
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        });
+}
+
+function saveToDataset() {
+  $.ajax({
+            url: '/classification/save_to_dataset',
             data: JSON.stringify({hashtag: $("#hashtag").val(), classifier_name: $("#select-classifier").find(":selected").text()}),
             contentType: 'application/json; charset=UTF-8',
             type: 'POST',

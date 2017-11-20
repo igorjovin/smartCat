@@ -2,13 +2,9 @@ from __future__ import print_function
 import tweepy
 from config import BASE_DIR, APP_STATIC, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
 from tweepy import OAuthHandler
-from tweepy import Stream
-from tweepy.streaming import StreamListener
 
-from sklearn.datasets import fetch_20newsgroups
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
@@ -26,21 +22,6 @@ import sys
 from time import time
 import os
 from config import BASE_DIR, APP_STATIC
- 
-class TwitterStreamListener(StreamListener):
- 
-    def on_data(self, data):
-        try:
-            with open('python.json', 'a') as f:
-                f.write(data)
-                return True
-        except BaseException as e:
-            print("Error on_data: %s" % str(e))
-        return True
- 
-    def on_error(self, status):
-        print(status)
-        return True
 
 class TweetPreprocessor():
 
@@ -136,6 +117,11 @@ class TweetPreprocessor():
                 line_parts = re.split(r'\t+', line)
                 self.acronym_map[line_parts[0]] = line_parts[1]
 
+
+auth = OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
+auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
+api = tweepy.API(auth)#, proxy="http://proxy.uns.ac.rs:8080")
+
 def process_hashtag(hashtag):
     if "#" not in hashtag:
         hashtag = "#" + hashtag
@@ -146,3 +132,16 @@ def process_hashtag(hashtag):
 def process(tweet, hashtag):
     preprocessed_tweet = TweetPreprocessor(tweet.text, hashtag).perform_preprocessing()
     return preprocessed_tweet
+
+def get_tweets_from_api(hashtag, items_per_page):
+    preprocessed_tweets = list()
+    original_tweets = list()
+    hashtag = process_hashtag(hashtag)
+    for tweet in tweepy.Cursor(api.search, q=hashtag, lang="en", result_type="recent").items(items_per_page): #, rpp=items_per_page, page=int(page_number)
+        tweet_text = process(tweet, hashtag)
+        if tweet_text not in preprocessed_tweets:
+           preprocessed_tweets.append(tweet_text)
+           original_tweets.append(tweet.text)
+    return preprocessed_tweets, original_tweets
+
+

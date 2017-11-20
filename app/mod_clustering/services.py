@@ -68,6 +68,7 @@ group_names = {}
 group_list = list()
 num_of_groups = 0
 showing_original_tweets = True
+used_hashtag = ""
 
 def cluster(hashtag, num_of_clusters):
     global preprocessed_tweets_with_groups
@@ -75,6 +76,7 @@ def cluster(hashtag, num_of_clusters):
     global tweets_to_show
     global group_names
     global num_of_groups
+    global used_hashtag
 
     group_names = {}
     num_of_groups = num_of_clusters
@@ -90,6 +92,7 @@ def cluster(hashtag, num_of_clusters):
     kmeans = TwitterKMeans(num_of_clusters)
     preprocessed_tweets_with_groups, original_tweets_with_groups = kmeans.perform_clustering(preprocessed_tweets, original_tweets, num_of_clusters)
     tweets_to_show = original_tweets_with_groups
+    used_hashtag = hashtag
     return group_names, tweets_to_show
 
 def move_tweet_to_cluster(key, desired_key, tweet_index, is_copy):
@@ -102,7 +105,7 @@ def move_tweet_to_cluster(key, desired_key, tweet_index, is_copy):
     global tweets_to_show
 
     if not all(str.isdigit(c) for c in desired_key):
-        desired_name = desired_key.lower().strip()
+        desired_name = desired_key.lower().strip().replace(" ", "_") 
         desired_key = int(num_of_groups)
         num_of_groups = num_of_groups + 1
         if desired_name not in group_names.values():
