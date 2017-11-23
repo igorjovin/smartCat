@@ -83,12 +83,14 @@
                 {{ render_field(form.hashtag, placeholder="Enter a hashtag", 
                                     autofocus="") }}
                 <select id="select-classifier">
-                  <option value='XGBoost' selected>XGBoost</option>
                   <option value='SVC' selected>SVM (SVC)</option>
                   <option value='NaiveBayes' selected>Naive Bayes</option>
                   <option value='RandomForest' selected>Random Forest</option>
+                  <option value='LogisticRegression' selected>Logistic Regression</option>
                 </select>
-                <a href="#" id="submit-validation" class="btn btn-sm btn-success my-2 my-sm-0">Submit</a>
+                <div class="inline buttons">
+                  <a href="#" id="submit-validation" class="btn btn-sm btn-success my-2 my-sm-0">Submit</a>
+                </div>
               </form>
             </p>
             <div id="please-wait" style="display:none">Please wait...</div>
@@ -109,6 +111,10 @@
 <script type="text/javascript">
 
 $("#submit-validation").click(function() {
+  if ($("#hashtag").val() == "") {
+      alert("Please enter a valid hashtag");
+      return;
+  }
   disableForm();
   $.ajax({
             url: '/classification/cross-validate',

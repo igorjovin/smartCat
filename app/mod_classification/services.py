@@ -50,7 +50,7 @@ class TweetClassifier():
         if classifier_name == "SVM (SVC)":
             self.classifier = OneVsRestClassifier(LinearSVC(C = 30, multi_class="crammer_singer"))
         if classifier_name == "Random Forest":
-            self.classifier = RandomForestClassifier(n_estimators = 100, criterion='entropy')
+            self.classifier = RandomForestClassifier(n_estimators = 150, criterion='entropy')
         if classifier_name == "Logistic Regression":
             self.classifier = OneVsRestClassifier(LogisticRegression(C = 30, max_iter = 1000))
         if classifier_name == "XGBoost":
@@ -109,13 +109,12 @@ class TweetClassifier():
         multi_label_binarizer = MultiLabelBinarizer(classes=list(class_list))
         y = multi_label_binarizer.fit_transform(y)
 
-        #rs = cross_validation.ShuffleSplit(4, n_iter=3, est_size=.25, random_state=0)
         train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.33, random_state=7)
         self.classifier.fit(train_X, train_y)
         y_pred = self.classifier.predict(test_X)
         predictions = [value for value in y_pred]
         # evaluate predictions
-        accuracy = self.hamming_score(test_y, y_pred)#accuracy_score(test_y, y_pred, normalize=False)
+        accuracy = accuracy_score(test_y, y_pred, normalize=True)#self.hamming_score(test_y, y_pred)accuracy_score(test_y, y_pred, normalize=False)
         f1 = f1_score(test_y, y_pred, average='weighted')  
         return accuracy, f1
 
@@ -281,7 +280,6 @@ def train_classifier(preprocessed_tweets_with_clusters, cluster_names, cluster_h
     global class_names
     global classifier
     class_names = cluster_names
-    print("classifier name " + classifier.classifier_name)
     delete_dataset_csv(cluster_hashtag)
     delete_all_classifiers(cluster_hashtag)
     classifier.write_cluster_tweets_to_dataset_csv(cluster_hashtag, class_names, preprocessed_tweets_with_clusters)

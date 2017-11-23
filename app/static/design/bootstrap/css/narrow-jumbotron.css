@@ -44,6 +44,10 @@ div.buttons {
   padding-left: 0.2rem;
 }
 
+div.lowered {
+  padding-top: 0.5rem;
+}
+
 div.tag {
   font-size: 0.7rem;
 }
@@ -128,6 +132,8 @@ form.admin {
   padding: 0.3rem 0.2rem;
   font-size: 0.7rem;
   color: #FFF;
+  outline: 1px solid black;
+  padding-bottom: 0.5rem;
 }
 .tweet-button {
   padding-top: 0.3rem;
@@ -135,10 +141,14 @@ form.admin {
 }
 .tweet-buttons {
   padding-top: 0.8rem;
+  padding-left: 0.5rem;
 }
 .remove-btn {
-  background-color: #FFF;
-  color: #ff0000;
+  background-color: #95a5a6
+  color: #FFF;
+  padding: 0.3rem 0.2rem;
+  font-size: 0.7rem;
+  padding-bottom: 0.8rem;
 }
 .tweet-text {
   padding-left: 0.5rem;

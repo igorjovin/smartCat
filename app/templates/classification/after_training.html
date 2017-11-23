@@ -167,6 +167,7 @@ function retrain() {
             success: function(response) {
               enableForm();
               location.reload();
+              alert("Successfully retrained classifier");
             },
             error: function(error) {
                 console.log(error);
@@ -184,6 +185,7 @@ function saveToDataset() {
             success: function(response) {
               enableForm();
               location.reload();
+              alert("Successfully saved new tweets to dataset");
             },
             error: function(error) {
                 console.log(error);

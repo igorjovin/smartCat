@@ -13,7 +13,7 @@
 </head>
 <body class="embedded">
     {% if tweets_with_predictions|length > 0 %}
-    <div><button class="btn btn-primary btn-sm" id="retrain" onclick="saveToDataset()">Save to dataset</button></div>
+    <div class="lowered"><button class="btn btn-primary btn-sm" id="retrain" onclick="saveToDataset()">Save to dataset</button></div>
     {% endif %}
     <div class="container table-container">
       <p class="legend"></p>
@@ -24,10 +24,10 @@
           <li class="stream-tweet-item">
               <div class="tweet-text">{{indexes_with_tweets[key]}}</div>
                 <div class="tweet-buttons">
-                <div class="inline info"><b>TOPICS:</b></div>
+                <div class="inline info"><b>TAGS:</b></div>
                 {% for val in value %}
                 <div class="tweet-button inline">
-                    <div class="inline tag"><span class = "label label-tag">{{val}}</span> <button class="btn btn-xs btn-danger remove-btn" onclick="removeTag('{{key}}', '{{val}}')">X</button> </div>
+                    <div class="inline tag"><span class = "label label-tag">{{val}}</span><button class="btn btn-xs btn-danger remove-btn" onclick="removeTag('{{key}}', '{{val}}')">X</button> </div>
                 </div>
                 {% endfor %}
                 <div id="add_tag_{{key}}" class="tweet-button inline"><button class="btn btn-xs btn-success inline" onclick="addTag('{{key}}')">Add tag</button>  </div>
@@ -47,8 +47,8 @@
 <script type="text/javascript">
 
 function addTag(tweet_index) {
-  var cancel_elem = "<button onclick=\"cancelAddTag(" + tweet_index + ")\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmAddTag(" + tweet_index + ", '')\">OK</button>";
+  var cancel_elem = "<button class=\"btn btn-primary btn-xs\" onclick=\"cancelAddTag(" + tweet_index + ")\">Cancel</button> ";
+  var ok_elem = " <button class=\"btn btn-primary btn-xs\" onclick=\"confirmAddTag(" + tweet_index + ", '')\">OK</button> ";
   var td_id = "#add_tag_" + tweet_index;
   $(td_id).empty();
   $(td_id).append(getSelect(tweet_index));
@@ -105,13 +105,13 @@ function confirmAddTag(tweet_index, desired_tag) {
 function cancelAddTag(tweet_index) {
   var td_id = "#add_tag_" + tweet_index;
   $(td_id).empty();
-  $(td_id).append("<button onclick=\"addTag(" + tweet_index + ")\">Add tag</button>");
+  $(td_id).append(" <button class=\"btn btn-success btn-xs inline\" onclick=\"addTag(" + tweet_index + ")\">Add tag</button>");
 }
 
 function createNewGroup(tweet_index) {
   var td_id = "#add_tag_" + tweet_index;
-  var cancel_elem = "<button onclick=\"addTag(" + tweet_index + ")\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmAddTag(" + tweet_index + ", 'Created new')\">OK</button>";
+  var cancel_elem = " <button class=\"btn btn-primary btn-xs\" onclick=\"addTag(" + tweet_index + ")\">Cancel</button>";
+  var ok_elem = " <button class=\"btn btn-primary btn-xs\" onclick=\"confirmAddTag(" + tweet_index + ", 'Created new')\">OK</button>";
   var group_name = "<input id=\"input-" + tweet_index + "\" type=\"text\" placeholder=\"New group\"/>";
   $(td_id).empty();
   $(td_id).append(group_name);
