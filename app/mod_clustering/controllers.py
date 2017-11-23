@@ -10,16 +10,6 @@ import app.mod_clustering.services as clustering_service
 # Define the blueprint: 'auth', set its url prefix: app.url/auth
 mod_clustering = Blueprint('clustering', __name__, url_prefix='/clustering')
 
-def update_session():
-    global preprocessed_tweets_with_groups
-    global hashtag
-    global group_names
-    print("HASHTAG " + hashtag)
-    session['preprocessed_tweets_with_groups'] = preprocessed_tweets_with_groups
-    session['hashtag'] = hashtag
-    session['group_names'] = group_names
-    session.modified = True
-
 @mod_clustering.route('/move_to_cluster', methods=['POST'])
 def move_tweet_to_cluster():
     form = ClusterResultsForm(request.form)

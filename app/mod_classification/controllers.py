@@ -12,40 +12,45 @@ import app.mod_clustering.services as clustering_service
 
 mod_classification = Blueprint('classification', __name__, url_prefix='/classification')
 default_classifier_name = "Naive Bayes"
+previous_hashtag = ""
+items_per_page = 10
+items_to_return = 100
+is_user = False
 
 @mod_classification.route('/remove_tag', methods=['POST'])
 def remove_tag_from_tweet():
+    global is_user
     form = PredictionsForm(request.form)
     tweet_index = int(request.json['tweet_index'])
     tag = str(request.json['tag'])
     classes, tweets_with_predictions, indexes_with_tweets = classification_service.remove_tag_from_tweet(tweet_index, tag)
-    return render_template("classification/predictions.html", form=form, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets, classes=classes)
+    if not is_user:
+        return render_template("classification/predictions.html", form=form, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets, classes=classes)
+    else:
+        return render_template("classification/predictions_user.html", form=form, classes=classes, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
 
 @mod_classification.route('/add_tag', methods=['POST'])
 def add_tag_to_tweet():
+    global is_user
     form = PredictionsForm(request.form)
     desired_tag = str(request.json['desired_tag'])
     tweet_index = int(request.json['tweet_index'])
     classes, tweets_with_predictions, indexes_with_tweets = classification_service.add_tag_to_tweet(tweet_index, desired_tag)
-    return render_template("classification/predictions.html", form=form, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets, classes=classes)
-
-@mod_classification.route('/move_to_class_user', methods=['POST'])
-def move_tweet_to_class_user():
-    form = PredictionsForm(request.form)
-    key = str(request.json['key'])
-    hashtag = str(request.json['hashtag'])
-    desired_key = str(request.json['desired_key'])
-    tweet_index = int(request.json['index']) - 1
-    tweets_with_predictions = classification_service.move_tweet_to_class(key, desired_key, tweet_index)
-    classification_service.retrain_classifier(hashtag, default_classifier_name)
-    return render_template("classification/predictions_user.html", form=form, tweets=tweets_with_predictions)
+    if not is_user:
+        return render_template("classification/predictions.html", form=form, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets, classes=classes)
+    else:
+        return render_template("classification/predictions_user.html", form=form, classes=classes, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
 
 @mod_classification.route('/new_group', methods=['POST'])
 def create_new_group():
+    global is_user
     form = PredictionsForm(request.form)
     desired_name= str(request.json['desired_name'])
     classification_service.create_new_class(desired_name) 
-    return render_template("classification/predictions.html", form=form, tweets=tweets_with_predictions)
+    if not is_user:
+        return render_template("classification/predictions.html", classes=classes, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
+    else:
+        return render_template("classification/predictions_user.html", form=form, classes=classes, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
 
 @mod_classification.route('/choose_classifier', methods=['POST'])
 def choose_classifier():
@@ -76,14 +81,20 @@ def retrain():
 
 @mod_classification.route('/predict/', methods=['GET', 'POST'])
 def predict():
+    global is_user
     form = AfterTrainingForm(request.form)
     hashtag = str(request.json['hashtag'])
     classifier_name = str(request.json['classifier_name'])
-    classes, tweets_with_predictions, indexes_with_tweets = classification_service.predict(hashtag, classifier_name, 100, 0, None)
+    is_user = False
+    classes, tweets_with_predictions, indexes_with_tweets = classification_service.predict(hashtag, classifier_name, items_to_return, None)
     return render_template("classification/predictions.html", form=form, classes=classes, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
 
 @mod_classification.route('/predict-user/', methods=['GET', 'POST'])
 def predict_user():
+    global is_user
+    global previous_hashtag
+    if previous_hashtag != "":
+        classification_service.save_to_dataset(previous_hashtag, default_classifier_name)
     form = IndexForm(request.form)
     hashtag = str(request.json['hashtag'])
     filter_classes = list(request.json['filter_classes'])
@@ -91,37 +102,23 @@ def predict_user():
     classes_from_session = list()
     tweets_with_predictions_from_session = dict()
     indexes_with_tweets_from_session = dict()
-    offset = 0
+    offset = items_per_page
     if session.get('offset'):
         offset = session['offset']
     if session.get('filter_classes'):
         previous_filter_classes = session['filter_classes']
     if session.get('classes'):
         classes_from_session = session['classes']
-    if session.get('tweets_with_predictions'):
-        tweets_with_predictions_from_session = session['tweets_with_predictions']
-    if session.get('indexes_with_tweets'):
-        indexes_with_tweets_from_session = session['indexes_with_tweets']
-    classes_from_session, tweets_with_predictions, indexes_with_tweets = classification_service.predict(hashtag, "Naive Bayes", 20, offset, filter_classes)
-    if previous_filter_classes == filter_classes:
-        classes_from_session.append(list(classes_from_session))
-        tweets_with_predictions_from_session.update(tweets_with_predictions)
-        indexes_with_tweets_from_session.update(indexes_with_tweets)
-        print("UPDATED DICT %d" % len(indexes_with_tweets_from_session.keys()))
-    else:
-        classes_from_session = list(classes_from_session)
-        tweets_with_predictions_from_session = tweets_with_predictions
-        indexes_with_tweets_from_session = indexes_with_tweets
-        offset = 0
+    classes_from_session, tweets_with_predictions, indexes_with_tweets = classification_service.predict(hashtag, default_classifier_name, 100, filter_classes)
+    if previous_filter_classes != filter_classes:
+        offset = items_per_page
     session['filter_classes'] = filter_classes
-    print("LENGTH %d " % len(indexes_with_tweets.keys()))
-    print("PREVIOUS OFFSET %d " % offset)
-    offset = offset + len(indexes_with_tweets.keys())
+    offset = offset + items_per_page
     session['offset'] = offset
     session['classes'] = classes_from_session
-    session['tweets_with_predictions'] = tweets_with_predictions
-    session['indexes_with_tweets'] = indexes_with_tweets
-    return render_template("classification/predictions_user.html", form=form, classes=classes_from_session, tweets_with_predictions=tweets_with_predictions_from_session, indexes_with_tweets=indexes_with_tweets_from_session)
+    previous_hashtag = hashtag
+    is_user = True
+    return render_template("classification/predictions_user.html", form=form, classes=classes_from_session, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
 
 @mod_classification.route('/prediction-classes/', methods=['GET', 'POST'])
 def prediction_classes():
@@ -146,8 +143,8 @@ def cross_validate():
 @mod_classification.route('/switch_tweet_view', methods=['GET'])
 def switch_tweet_view():
     form = PredictionsForm(request.form)
-    tweets_with_predictions = classification_service.switch_tweet_view()
-    return render_template("classification/predictions.html", form=form, tweets=tweets_with_predictions)
+    classes, tweets_with_predictions, indexes_with_tweets = classification_service.switch_tweet_view()
+    return render_template("classification/predictions.html", form=form, classes=classes, tweets_with_predictions=tweets_with_predictions, indexes_with_tweets=indexes_with_tweets)
 
 @mod_classification.route('/save_to_dataset', methods=['POST'])
 def save_to_dataset():
@@ -161,7 +158,10 @@ def save_to_dataset():
 
 @mod_classification.route('/logout', methods=['GET'])
 def invalidate_session():
+    global previous_hashtag
     form = IndexForm(request.form)
+    if previous_hashtag != "":
+        classification_service.save_to_dataset(previous_hashtag, default_classifier_name)
     session.clear()
     return render_template("twitter/index_user.html", form=form)
 

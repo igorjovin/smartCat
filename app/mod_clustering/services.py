@@ -77,7 +77,9 @@ def cluster(hashtag, num_of_clusters):
     global group_names
     global num_of_groups
     global used_hashtag
+    global showing_original_tweets
 
+    showing_original_tweets = True
     group_names = {}
     num_of_groups = num_of_clusters
     hashtag = twitter_service.process_hashtag(hashtag)

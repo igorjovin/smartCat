@@ -12,10 +12,10 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import Normalizer
 from sklearn import metrics
-from sklearn.svm import SVC, SVR
+from sklearn.svm import LinearSVC, SVC, SVR
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -32,13 +32,13 @@ import csv
 import numpy as np
 import logging
 from time import time
-import os
+import os, glob
 from config import BASE_DIR, APP_STATIC
 
 class TweetClassifier():
 
     classifier_name = ""
-    classifier = MultinomialNB()
+    classifier = OneVsRestClassifier(MultinomialNB())
     vectorizer = CountVectorizer()#TfidfVectorizer(min_df=2,
                              #max_df = 0.8,
                              #sublinear_tf=True)
@@ -47,16 +47,14 @@ class TweetClassifier():
         self.classifier_name = classifier_name
         if classifier_name == "Naive Bayes":
             self.classifier = OneVsRestClassifier(MultinomialNB())
-        if classifier_name == "SVC":
-            self.classifier = SVC(C = 30)
-        if classifier_name == "SVR":
-            self.classifier = SVR()
+        if classifier_name == "SVM (SVC)":
+            self.classifier = OneVsRestClassifier(LinearSVC(C = 30, multi_class="crammer_singer"))
         if classifier_name == "Random Forest":
             self.classifier = RandomForestClassifier(n_estimators = 100, criterion='entropy')
-        if classifier_name == "Linear Regression":
-            self.classifier = LinearRegression()
+        if classifier_name == "Logistic Regression":
+            self.classifier = OneVsRestClassifier(LogisticRegression(C = 30, max_iter = 1000))
         if classifier_name == "XGBoost":
-            self.classifier = xgb.XGBClassifier(max_depth=10, n_estimators=500, learning_rate=0.05)
+            self.classifier = OneVsRestClassifier(xgb.XGBClassifier(max_depth=10, n_estimators=500, learning_rate=0.05))
 
     def classify(self, hashtag):
         dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
@@ -75,7 +73,7 @@ class TweetClassifier():
         self.save_classifier(hashtag)
         return True
 
-    def predict(self, preprocessed_tweets, original_tweets, hashtag, offset):
+    def predict(self, preprocessed_tweets, original_tweets, hashtag):
         loaded_classifier = self.load_classifier(hashtag)
         if not loaded_classifier:
             return None
@@ -85,44 +83,55 @@ class TweetClassifier():
         indexes_with_preprocessed_tweets = dict()
         indexes_with_original_tweets = dict()
         classes = self.load_classes(hashtag)
-        j = offset
-        print("OFFSET %d" % offset)
+        j = 0
         for i in predictions:
             contains_1 = False
             for index, single_prediction in enumerate(i):
-                print("PREDICT %d " % single_prediction)
                 if single_prediction == 1:
                     contains_1 = True
                     tweets_with_predictions[j].append(classes[index])
             if contains_1:
-                indexes_with_preprocessed_tweets[j] = preprocessed_tweets[j-offset]
-                print("PREPROC TWEET %d, %s" % (j-offset, preprocessed_tweets[j-offset]))
-                indexes_with_original_tweets[j] = original_tweets[j-offset]
+                indexes_with_preprocessed_tweets[j] = preprocessed_tweets[j]
+                indexes_with_original_tweets[j] = original_tweets[j]
                 j = j + 1
         return classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets
 
     def cross_validate(self, hashtag):
         dataset = pd.read_csv(os.path.join(APP_STATIC, 'dataset-' + hashtag + '.csv'),
             header=None, names=['label','tweet'])
-        le = LabelEncoder()
         X = dataset['tweet'].tolist()
         y = dataset['label'].tolist()
         X = self.vectorizer.fit_transform(X)
-        y = le.fit_transform(y)
+        for i, label in enumerate(y):
+            if ";" in label:
+                y[i] = [ single_label.strip() for single_label in label.split(";") if single_label.strip() ]
+        class_list = self.load_classes(hashtag)
+        multi_label_binarizer = MultiLabelBinarizer(classes=list(class_list))
+        y = multi_label_binarizer.fit_transform(y)
 
+        #rs = cross_validation.ShuffleSplit(4, n_iter=3, est_size=.25, random_state=0)
         train_X, test_X, train_y, test_y = train_test_split(X, y, test_size=0.33, random_state=7)
         self.classifier.fit(train_X, train_y)
-        if self.is_regression():
-            #y_pred = self.classifier.predict_proba(test_X)
-            y_pred = self.classifier.predict(test_X)
-            predictions = y_pred.argmax(axis=0)
-        else:
-            y_pred = self.classifier.predict(test_X)
-            predictions = [round(value) for value in y_pred]
+        y_pred = self.classifier.predict(test_X)
+        predictions = [value for value in y_pred]
         # evaluate predictions
-        accuracy = accuracy_score(test_y, predictions)
+        accuracy = self.hamming_score(test_y, y_pred)#accuracy_score(test_y, y_pred, normalize=False)
         f1 = f1_score(test_y, y_pred, average='weighted')  
         return accuracy, f1
+
+    def hamming_score(self, y_true, y_pred, normalize=True, sample_weight=None):
+        acc_list = []
+        for i in range(y_true.shape[0]):
+            set_true = set(np.where(y_true[i])[0] )
+            set_pred = set(np.where(y_pred[i])[0] )
+            tmp_a = None
+            if len(set_true) == 0 and len(set_pred) == 0:
+                tmp_a = 1
+            else:
+                tmp_a = len(set_true.intersection(set_pred))/\
+                        float( len(set_true.union(set_pred)) )
+            acc_list.append(tmp_a)
+        return np.max(acc_list)
 
     def classifier_exists(self, hashtag):
         classifier_file_name = "classifier-" + hashtag + "-" + self.classifier_name.replace(" ", "") + ".pickle"    
@@ -206,7 +215,7 @@ class TweetClassifier():
                 cw = csv.writer(f)
                 for index, value in indexes_with_tweets_to_append.iteritems():
                     label = ""
-                    for cl in tweets_with_predictions[index]:
+                    for cl in tweets_with_predictions_to_append[index]:
                         label += cl + ";"
                     cw.writerow([str(label), str(value.encode('utf-8'))])
                 f.close()
@@ -254,6 +263,7 @@ classifier = TweetClassifier("Naive Bayes")
 tweets_with_predictions = defaultdict(list) #key = index of tweet; value = list of classes
 indexes_with_preprocessed_tweets = dict() #key = index of tweet; value = tweet text
 indexes_with_original_tweets = dict()
+indexes_with_tweets_to_show = dict()
 class_names = {}
 classes = set()
 hashtag = ""
@@ -271,6 +281,9 @@ def train_classifier(preprocessed_tweets_with_clusters, cluster_names, cluster_h
     global class_names
     global classifier
     class_names = cluster_names
+    print("classifier name " + classifier.classifier_name)
+    delete_dataset_csv(cluster_hashtag)
+    delete_all_classifiers(cluster_hashtag)
     classifier.write_cluster_tweets_to_dataset_csv(cluster_hashtag, class_names, preprocessed_tweets_with_clusters)
     classifier.classify(cluster_hashtag)
 
@@ -281,7 +294,7 @@ def retrain_classifier(hashtag, classifier_name):
     #classifier.write_to_dataset_csv(hashtag, preprocessed_tweets_with_predictions)
     classifier.classify(hashtag)
 
-def predict(hashtag, classifier_name, items_per_page, offset, filter_classes): #ovo treba da bude sakupljanje tvitova
+def predict(hashtag, classifier_name, items_per_page, filter_classes): #ovo treba da bude sakupljanje tvitova
     global classifier
     global tweets_with_predictions
     global indexes_with_original_tweets
@@ -296,12 +309,13 @@ def predict(hashtag, classifier_name, items_per_page, offset, filter_classes): #
     original_tweets = list()
     classifier = TweetClassifier(classifier_name)
     if not classifier.classifier_exists(hashtag):
-        return {}
+        return {}, {}, {}
     preprocessed_tweets, original_tweets = twitter_service.get_tweets_from_api(hashtag, items_per_page)
-    classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets = classifier.predict(preprocessed_tweets, original_tweets, hashtag, offset)
+    classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets = classifier.predict(preprocessed_tweets, original_tweets, hashtag)
     if filter_classes is not None and filter_classes:
         tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets = get_tweets_from_filter_classes(filter_classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets)
-    return classes, tweets_with_predictions, indexes_with_preprocessed_tweets#get_tweets_to_show()
+    indexes_with_tweets_to_show = indexes_with_original_tweets
+    return classes, tweets_with_predictions, indexes_with_tweets_to_show#get_tweets_to_show()
 
 def cross_validate(hashtag, classifier_name):
     hashtag = twitter_service.process_hashtag(hashtag)
@@ -315,16 +329,22 @@ def add_tag_to_tweet(tweet_index, desired_tag):
     global tweets_with_predictions
     global classes
     if desired_tag not in classes:
-        classes.add(desired_tag)
+        classes.append(desired_tag)
     if desired_tag not in tweets_with_predictions[tweet_index]:
         tweets_with_predictions[tweet_index].append(desired_tag)
-    return classes, tweets_with_predictions, indexes_with_preprocessed_tweets#get_tweets_to_show()
+    indexes_with_tweets_to_show = indexes_with_preprocessed_tweets
+    if showing_original_tweets:
+        indexes_with_tweets_to_show = indexes_with_original_tweets
+    return classes, tweets_with_predictions, indexes_with_tweets_to_show
 
 def remove_tag_from_tweet(tweet_index, tag):
     global tweets_with_predictions
     global classes
     tweets_with_predictions[tweet_index].remove(tag)
-    return classes, tweets_with_predictions, indexes_with_preprocessed_tweets#get_tweets_to_show()
+    indexes_with_tweets_to_show = indexes_with_preprocessed_tweets
+    if showing_original_tweets:
+        indexes_with_tweets_to_show = indexes_with_original_tweets
+    return classes, tweets_with_predictions, indexes_with_tweets_to_show
 
 def create_new_class(desired_name):
     global classes
@@ -343,20 +363,11 @@ def switch_tweet_view():
     global showing_original_tweets
     if showing_original_tweets:
         showing_original_tweets = False
-        return preprocessed_tweets_with_predictions
+        indexes_with_tweets_to_show = indexes_with_preprocessed_tweets
     else:
         showing_original_tweets = True
-        return original_tweets_with_predictions
-    return tweets_to_show
-
-def get_tweets_to_show():
-    global preprocessed_tweets_with_predictions
-    global original_tweets_with_predictions
-    global showing_original_tweets
-    if showing_original_tweets:
-        return original_tweets_with_predictions
-    else:
-        return preprocessed_tweets_with_predictions
+        indexes_with_tweets_to_show = indexes_with_original_tweets
+    return classes, tweets_with_predictions, indexes_with_tweets_to_show
 
 def get_tweets_from_filter_classes(filter_classes, tweets_with_predictions, indexes_with_preprocessed_tweets, indexes_with_original_tweets):
     tweets_with_predictions_return = dict()
@@ -388,6 +399,25 @@ def get_classes_from_dataset(hashtag):
             if label.strip() not in class_list and label.strip() != "":
                 class_list.append(label.strip())
     return class_list
+
+def delete_dataset_csv(hashtag):
+    try:
+        csv_file_name = get_dataset_csv_file_path(hashtag)
+        os.remove(csv_file_name)
+        return True
+    except IOError:
+        logging.warning('Unable to delete CSV dataset.')
+        return False
+
+def delete_all_classifiers(hashtag):
+    for filename in glob.glob(os.path.join(APP_STATIC, "classifier-" + hashtag + "*")):
+        os.remove(filename) 
+    for filename in glob.glob(os.path.join(APP_STATIC, "vectorizer-" + hashtag + "*")):
+        os.remove(filename) 
+
+def get_dataset_csv_file_path(hashtag):
+    file_name = 'dataset-' + hashtag + '.csv'
+    return os.path.join(os.path.join(APP_STATIC, file_name))
 
 
  

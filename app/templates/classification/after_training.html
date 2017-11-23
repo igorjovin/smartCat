@@ -1,74 +1,144 @@
-{% macro render_field(field, placeholder=None) %}
-{% if field.errors %}
-<div>
-{% elif field.flags.error %}
-<div>
-{% else %}
-<div>
-{% endif %}
-    {% set css_class = 'form-control ' + kwargs.pop('class', '') %}
-    {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
-</div>
-{% endmacro %}
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="https://getbootstrap.com/favicon.ico">
 
-<div>
+    <title>Twitter Miner</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="/static/design/bootstrap/css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="/static/design/bootstrap/css/narrow-jumbotron.css" rel="stylesheet">
+  </head>
+
+  <body>
+  {% macro render_field(field, placeholder=None) %}
+  {% if field.errors %}
   <div>
-    <legend>Training complete. Proceed to classification of new tweets by entering a hashtag below.</legend>
-    {% with errors = get_flashed_messages(category_filter=["error"]) %}
-    {% if errors %}
-    <div>
-    {% for error in errors %}
-      {{ error }}<br>
-    {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    {% if form.errors %}
-    <div>
-    {% for field, error in form.errors.items() %}
-    {% for e in error %}
-    {{ e }}<br>
-    {% endfor %}
-    {% endfor %}
-    </div>
-    {% endif %}
-    <div class="inline">
-      {{ form.csrf_token }}
-      {{ render_field(form.hashtag, placeholder="Enter a hashtag",
-                                  autofocus="") }}
-      <div>
-      </div>
-      <button id="submit_search" type="submit" name="submit">Submit</button>
-      <select id="select-classifier">
-        <option value='XGBoost' selected>XGBoost</option>
-        <option value='SVC' selected>SVM (SVC)</option>
-        <option value='NaiveBayes' selected>Naive Bayes</option>
-        <option value='RandomForest' selected>Random Forest</option>
-      </select>
-    </div>  
+  {% elif field.flags.error %}
+  <div>
+  {% else %}
+  <div>
+  {% endif %}
+      {% set css_class = 'form-control mr-sm-2' + kwargs.pop('class', '') %}
+      {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
   </div>
-</div>
+  {% endmacro %}
 
-<div id="please-wait" style="display:none">Please wait...</div>
-<button id="retrain" onclick="retrain()">Retrain</button>
-<button id="retrain" onclick="saveToDataset()">Save to dataset</button>
-<button id="home">Home</button>
-<button id="cross-validate">Cross validate</button>
-<div id="predictions"></div>
+  {% with errors = get_flashed_messages(category_filter=["error"]) %}
+  {% if errors %}
+  <div>
+  {% for error in errors %}
+    {{ error }}<br>
+  {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
 
+  {% if form.errors %}
+  <div>
+  {% for field, error in form.errors.items() %}
+  {% for e in error %}
+  {{ e }}<br>
+  {% endfor %}
+  {% endfor %}
+  </div>
+  {% endif %}
+
+    <div class="container">
+      <header class="header clearfix">
+        <nav>
+          <ul class="nav nav-pills float-right">
+            <li class="nav-item">
+              <a class="nav-link" href="/twitter/index-admin/">Home </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="#">Predictions <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/classification/cross-validation">Cross validation</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/twitter/index/">Log out</a>
+            </li>
+          </ul>
+        </nav>
+        <img src="/static/design/logo.png"/>
+        <h4 class="text-muted">Twitter Miner</h4>
+      </header>
+
+      <main role="main">
+
+        <div class="jumbotron">
+          <div class="container">
+            <p class="lead">Get tweets of different topics by entering a hashtag below.</p>
+            <p>
+              <form class="form-inline admin my-2 my-lg-0">
+                {{ form.csrf_token }}
+                {{ render_field(form.hashtag, placeholder="Enter a hashtag", 
+                                    autofocus="") }}
+                <select id="select-classifier">
+                  <option value='XGBoost'>XGBoost</option>
+                  <option value='SVC'>SVM (SVC)</option>
+                  <option value='NaiveBayes'>Naive Bayes</option>
+                  <option value='RandomForest'>Random Forest</option>
+                  <option value='LogisticRegression'>Logistic Regression</option>
+                </select>
+                <div class="inline buttons">
+                  <a href="#" id="submit_search" class="btn btn-sm btn-success my-2 my-sm-0">Submit</a>
+                  <a href="#" onclick="retrain()" class="btn btn-sm btn-primary my-2 my-sm-0">Retrain</a>
+                </div>
+              </form>
+            </p>
+            <div id="please-wait" style="display:none">Please wait...</div>
+            <div><button style="display:none" class="btn btn-sm btn-primary" value="preproc" id="switch-tweets">Show preprocessed tweets</button></div>
+            <div id="predictions"></div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <p>© Igor Jovin 2017</p>
+      </footer>
+
+    </div> <!-- /container -->
+  
+
+</body>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
 
-$("#home").click(function() {
-  location.href = "/twitter/index/";
-});
-
-$("#cross-validate").click(function() {
-  location.href = "/classification/cross-validation";
+$("#switch-tweets").click(function() {
+  var previous_text = $("#switch-tweets").text();
+  if (previous_text == "Show preprocessed tweets") {
+    $("#switch-tweets").text("Show original tweets");
+  } else {
+    $("#switch-tweets").text("Show preprocessed tweets");
+  }
+  $.ajax({
+        url: '/classification/switch_tweet_view',
+        contentType: 'application/json; charset=UTF-8',
+        type: 'GET',
+        dataType: "html",
+        success: function(response) {
+          $("#predictions").html(response);
+        },
+        error: function(error) {
+            console.log(error);
+        }
+    });
 });
 
 $("#submit_search").click(function() {
+  if ($("#hashtag").val() == "") {
+      alert("Please enter a valid hashtag");
+      return;
+  }
   disableForm();
   $.ajax({
             url: '/classification/predict/',
@@ -78,6 +148,7 @@ $("#submit_search").click(function() {
             dataType: "html",
             success: function(response) {
               enableForm();
+              $("#switch-tweets").show();
               $("#predictions").html(response);
             },
             error: function(error) {
@@ -132,3 +203,5 @@ function enableForm() {
   $("#submit_search").prop("disabled", false);
 }
 </script>
+
+</html>

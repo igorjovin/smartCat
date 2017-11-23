@@ -1,66 +1,112 @@
-{% macro render_field(field, placeholder=None) %}
-{% if field.errors %}
-<div>
-{% elif field.flags.error %}
-<div>
-{% else %}
-<div>
-{% endif %}
-    {% set css_class = 'form-control ' + kwargs.pop('class', '') %}
-    {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
-</div>
-{% endmacro %}
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="https://getbootstrap.com/favicon.ico">
 
-<div>
+    <title>Twitter Miner</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="/static/design/bootstrap/css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="/static/design/bootstrap/css/narrow-jumbotron.css" rel="stylesheet">
+  </head>
+
+  <body>
+  {% macro render_field(field, placeholder=None) %}
+  {% if field.errors %}
   <div>
-    <legend>Training complete. Proceed to classification of new tweets by entering a hashtag below.</legend>
-    {% with errors = get_flashed_messages(category_filter=["error"]) %}
-    {% if errors %}
-    <div>
-    {% for error in errors %}
-      {{ error }}<br>
-    {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    {% if form.errors %}
-    <div>
-    {% for field, error in form.errors.items() %}
-    {% for e in error %}
-    {{ e }}<br>
-    {% endfor %}
-    {% endfor %}
-    </div>
-    {% endif %}
-    <div class="inline">
-      {{ form.csrf_token }}
-      {{ render_field(form.hashtag, placeholder="Enter a hashtag",
-                                  autofocus="") }}
-      <div>
-      </div>
-      <button id="submit-validation" type="submit" name="submit">Submit</button>
-      <select id="select-classifier">
-        <option value='XGBoost' selected>XGBoost</option>
-        <option value='SVC' selected>SVC</option>
-        <option value='SVR' selected>SVR</option>
-        <option value='NaiveBayes' selected>Naive Bayes</option>
-        <option value='RandomForest' selected>Random Forest</option>
-      </select>
-    </div>  
+  {% elif field.flags.error %}
+  <div>
+  {% else %}
+  <div>
+  {% endif %}
+      {% set css_class = 'form-control mr-sm-2' + kwargs.pop('class', '') %}
+      {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
   </div>
-</div>
+  {% endmacro %}
 
-<div id="please-wait" style="display:none">Please wait...</div>
-<button id="home">Home</button>
-<div id="validation-results"></div>
+  {% with errors = get_flashed_messages(category_filter=["error"]) %}
+  {% if errors %}
+  <div>
+  {% for error in errors %}
+    {{ error }}<br>
+  {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
 
+  {% if form.errors %}
+  <div>
+  {% for field, error in form.errors.items() %}
+  {% for e in error %}
+  {{ e }}<br>
+  {% endfor %}
+  {% endfor %}
+  </div>
+  {% endif %}
+
+    <div class="container">
+      <header class="header clearfix">
+        <nav>
+          <ul class="nav nav-pills float-right">
+            <li class="nav-item">
+              <a class="nav-link" href="/twitter/index-admin/">Home </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/classification/after_training">Predictions</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="/classification/cross-validation">Cross validation <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/twitter/index/">Log out</a>
+            </li>
+          </ul>
+        </nav>
+        <img src="/static/design/logo.png"/>
+        <h4 class="text-muted">Twitter Miner</h4>
+      </header>
+
+      <main role="main">
+
+        <div class="jumbotron">
+          <div class="container">
+            <p class="lead">Cross validate a model by entering the model's dedicated hashtag below and choosing an algorithm you want to cross validate.</p>
+            <p>
+              <form class="form-inline my-2 my-lg-0">
+                {{ form.csrf_token }}
+                {{ render_field(form.hashtag, placeholder="Enter a hashtag", 
+                                    autofocus="") }}
+                <select id="select-classifier">
+                  <option value='XGBoost' selected>XGBoost</option>
+                  <option value='SVC' selected>SVM (SVC)</option>
+                  <option value='NaiveBayes' selected>Naive Bayes</option>
+                  <option value='RandomForest' selected>Random Forest</option>
+                </select>
+                <a href="#" id="submit-validation" class="btn btn-sm btn-success my-2 my-sm-0">Submit</a>
+              </form>
+            </p>
+            <div id="please-wait" style="display:none">Please wait...</div>
+            <div id="validation-results"></div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <p>© Igor Jovin 2017</p>
+      </footer>
+
+    </div> <!-- /container -->
+  
+
+</body>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
-
-$("#home").click(function() {
-  location.href = "/twitter/index/";
-});
 
 $("#submit-validation").click(function() {
   disableForm();
@@ -92,3 +138,7 @@ function enableForm() {
   $("#submit-validation").prop("disabled", false);
 }
 </script>
+
+</html>
+
+

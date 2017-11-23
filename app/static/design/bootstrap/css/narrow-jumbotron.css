@@ -1,0 +1,249 @@
+/* Space out content a bit */
+body {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+body.embedded {
+  padding-top: 0.5rem;
+  padding-bottom: 0rem;
+}
+
+/* Everything but the jumbotron gets side spacing for mobile first views */
+.header,
+.marketing,
+.footer {
+  padding-right: 1rem;
+  padding-left: 1rem;
+}
+
+/* Custom page header */
+.header {
+  padding-bottom: 1rem;
+  border-bottom: .05rem solid #e5e5e5;
+}
+
+/* Make the masthead heading the same height as the navigation */
+.header h3 {
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 3rem;
+}
+
+div.inline {
+  float:left;
+  padding-right: 0.5rem;
+}
+
+div.info {
+  font-size: 0.6rem;
+  padding-top: 0.3rem;
+}
+
+div.buttons {
+  padding-left: 0.2rem;
+}
+
+div.tag {
+  font-size: 0.7rem;
+}
+
+.clearBoth { clear:both; }
+/* Custom page footer */
+.footer {
+  padding-top: 1.5rem;
+  color: #777;
+  border-top: .05rem solid #e5e5e5;
+}
+
+form.form-inline {
+  padding-left: 3.5rem;
+}
+form.admin {
+  padding-left: 2.0rem;
+}
+
+/* Customize container */
+@media (min-width: 48em) {
+  .container {
+    max-width: 46rem;
+  }
+}
+.container-narrow > hr {
+  margin: 1.3rem 0;
+}
+
+/* Main marketing message and sign up button */
+.jumbotron {
+  text-align: center;
+  border-bottom: .05rem solid #e5e5e5;
+}
+.jumbotron-extended {
+  text-align: left;
+}
+.jumbotron .btn {
+  padding: .55rem 1.0rem;
+  font-size: 1.0rem;
+}
+.mini-container {
+  text-align: left;
+  float: none;
+  padding-left: 3.5rem;
+}
+.table-container {
+  text-align: left;
+  padding-top: 1.5rem;
+  padding-left: 0.1rem;
+  padding-right: 0.1rem;
+}
+.table-container .btn {
+  padding: 0.3rem 0.2rem;
+  padding-right: 0.3rem;
+  font-size: 0.7rem;
+}
+.table-container .select {
+  padding: 0.3rem 0.2rem;
+  font-size: 0.7rem;
+}
+.stream-tweets {
+  font-size: 0.8rem;
+  padding-left: 0.1rem;
+  padding-right: 0.1rem;
+}
+.stream-tweets p {
+  font-size: 0.5rem;
+}
+.stream-tweet-item {
+  padding-bottom: 0.4rem;
+}
+.stream-tweet-clustered-item {
+  padding-bottom: 0.1rem;
+  font-size: 0.4rem;
+}
+.cluster-name {
+  text-align: center;
+}
+.label-tag {
+  background-color: #95a5a6;
+  padding: 0.3rem 0.2rem;
+  font-size: 0.7rem;
+  color: #FFF;
+}
+.tweet-button {
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+}
+.tweet-buttons {
+  padding-top: 0.8rem;
+}
+.remove-btn {
+  background-color: #FFF;
+  color: #ff0000;
+}
+.tweet-text {
+  padding-left: 0.5rem;
+}
+
+ul {
+  list-style-type: none;
+}
+.mini-container .btn {
+  padding: .55rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+.button-for-class {
+  padding-top: 0.7rem;
+}
+
+/* Supporting marketing content */
+.marketing {
+  margin: 3rem 0;
+}
+.marketing p + h4 {
+  margin-top: 1.5rem;
+}
+.table-tweets {
+  font-size: 0.7rem;
+}
+
+/* Sliders */
+ /* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {display:none;}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+} 
+
+/* Responsive: Portrait tablets and up */
+@media screen and (min-width: 48em) {
+  /* Remove the padding we set earlier */
+  .header,
+  .marketing,
+  .footer {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  /* Space out the masthead */
+  .header {
+    margin-bottom: 2rem;
+  }
+
+  /* Remove the bottom border on the jumbotron for visual effect */
+  .jumbotron {
+    border-bottom: 0;
+  }
+}

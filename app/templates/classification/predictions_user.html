@@ -1,30 +1,50 @@
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
-<div>
-    {% if tweets_with_predictions|length > 0 %}
-      <table class="table table-striped table-bordered table-hover">
-              {% for key, value in tweets_with_predictions.iteritems() %}
-              <tr>
-                  <td><b>{{indexes_with_tweets[key]}}</b></td> 
-                  {% for val in value %}
-                  <td>
-                      {{val}} <button onclick="removeTag('{{key}}', '{{val}}')">Remove</button>
-                  </td>
-                  {% endfor %}
-                  <td id="add_tag_{{key}}"><button onclick="addTag('{{key}}')">Add tag</button>  </td>
-              </tr>
-              {% endfor %}
-      </table>
-      <button onclick="predict()">Next>></button>
-    {% else %}
-      <p>No tweets to show.</p>
-    {% endif %}
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <link rel="icon" href="https://getbootstrap.com/favicon.ico">
 
+    <!-- Bootstrap core CSS -->
+    <link href="/static/design/bootstrap/css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="/static/design/bootstrap/css/narrow-jumbotron.css" rel="stylesheet">
+</head>
+<body class="embedded">
+    <div class="container table-container">
+      <p class="legend"></p>
+      {% if tweets_with_predictions|length > 0 %}
+      <ul class="stream-tweets">
+          {% for key, value in tweets_with_predictions.iteritems() %}
+          <li class="stream-tweet-item">
+              <div class="tweet-text">{{indexes_with_tweets[key]}}</div>
+                <div class="tweet-buttons">
+                <div class="inline info"><b>TOPICS:</b></div>
+                {% for val in value %}
+                <div class="tweet-button inline">
+                    <div class="inline tag"><span class = "label label-tag">{{val}}</span> <button class="btn btn-xs btn-danger remove-btn" onclick="removeTag('{{key}}', '{{val}}')">X</button> </div>
+                </div>
+                {% endfor %}
+                <div id="add_tag_{{key}}" class="tweet-button inline"><button class="btn btn-xs btn-success inline" onclick="addTag('{{key}}')">Add tag</button>  </div>
+              </div>
+              <br class="clearBoth" />
+          </li>
+          <hr />
+          {% endfor %}
+      </ol>
+      {% else %}
+        <p>No tweets to show.</p>
+      {% endif %}
+    </div>
+</body>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
 
 function addTag(tweet_index) {
-  var cancel_elem = "<button onclick=\"cancelAddTag(" + tweet_index + ")\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmAddTag(" + tweet_index + ", '')\">OK</button>";
+  var cancel_elem = "<div class=\"inline\"><button class=\"btn btn-xs btn-primary\" onclick=\"cancelAddTag(" + tweet_index + ")\">Cancel</button></div>";
+  var ok_elem = "<div class=\"inline\"><button class=\"btn btn-xs btn-primary inline\" onclick=\"confirmAddTag(" + tweet_index + ", '')\">OK</button></div>";
   var td_id = "#add_tag_" + tweet_index;
   $(td_id).empty();
   $(td_id).append(getSelect(tweet_index));
@@ -81,13 +101,13 @@ function confirmAddTag(tweet_index, desired_tag) {
 function cancelAddTag(tweet_index) {
   var td_id = "#add_tag_" + tweet_index;
   $(td_id).empty();
-  $(td_id).append("<button onclick=\"addTag(" + tweet_index + ")\">Add tag</button>");
+  $(td_id).append("<button class=\"btn btn-xs btn-success\" onclick=\"addTag(" + tweet_index + ")\">Add tag</button>");
 }
 
 function createNewGroup(tweet_index) {
   var td_id = "#add_tag_" + tweet_index;
-  var cancel_elem = "<button onclick=\"addTag(" + tweet_index + ")\">Cancel</button>";
-  var ok_elem = "<button onclick=\"confirmAddTag(" + tweet_index + ", 'Created new')\">OK</button>";
+  var cancel_elem = "<div class=\"inline\"><button class=\"btn btn-xs btn-primary\" onclick=\"addTag(" + tweet_index + ")\">Cancel</button></div>";
+  var ok_elem = "<div class=\"inline\"><button class=\"btn btn-xs btn-primary\" onclick=\"confirmAddTag(" + tweet_index + ", 'Created new')\">OK</button></div>";
   var group_name = "<input id=\"input-" + tweet_index + "\" type=\"text\" placeholder=\"New group\"/>";
   $(td_id).empty();
   $(td_id).append(group_name);
@@ -96,13 +116,15 @@ function createNewGroup(tweet_index) {
 }
 
 function getSelect(tweet_index) {
-  var select = "<select id=\"select_" + tweet_index + "\">";
+  var select = "<div class=\"inline\"><select class=\"select\" id=\"select_" + tweet_index + "\">";
   {% for value in classes %}
       select += "<option value='{{value}}'>{{value}}</option>";
   {% endfor %}
   select += "<option value='new_group'>New group</option>";
-  select += "</select>";
+  select += "</select></div>";
   return select;
 }
 
 </script>
+</html>
+

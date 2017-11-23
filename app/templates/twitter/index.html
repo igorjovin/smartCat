@@ -1,27 +1,75 @@
-{% macro render_field(field, placeholder=None) %}
-{% if field.errors %}
-<div>
-{% elif field.flags.error %}
-<div>
-{% else %}
-<div>
-{% endif %}
-    {% set css_class = 'form-control ' + kwargs.pop('class', '') %}
-    {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
-</div>
-{% endmacro %}
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="https://getbootstrap.com/favicon.ico">
 
-<div>
+    <title>Twitter Miner</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="/static/design/bootstrap/css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="/static/design/bootstrap/css/narrow-jumbotron.css" rel="stylesheet">
+  </head>
+
+  <body>
+  {% macro render_field(field, placeholder=None) %}
+  {% if field.errors %}
   <div>
-    <legend>Welcome</legend>
-    <div class="inline">
-      <div>
-        <button id="user">USER</button>
-        <button id="admin">ADMIN (DATA SCIENTIST)</button>
-      </div>
-    </div>  
+  {% elif field.flags.error %}
+  <div>
+  {% else %}
+  <div>
+  {% endif %}
+      {% set css_class = 'form-control ' + kwargs.pop('class', '') %}
+      {{ field(class=css_class, placeholder=placeholder, **kwargs) }}
   </div>
-</div>
+  {% endmacro %}
+
+    <div class="container">
+      <header class="header clearfix">
+        <nav>
+          <ul class="nav nav-pills float-right">
+            <li class="nav-item">
+              <a class="nav-link active" href="#">Home <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">About</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">Contact</a>
+            </li>
+          </ul>
+        </nav>
+        <img src="/static/design/logo.png"/>
+        <h4 class="text-muted">Twitter Miner</h4>
+      </header>
+
+      <main role="main">
+
+        <div class="jumbotron">
+          <h2 class="display-2">Twitter Miner</h2>
+          <p class="lead">Select the mode in which you want to use the application.</p>
+          <p>
+            <a href="#" class="btn btn-sm btn-default" id="user" role="button">USER</a>
+            <a href="#" class="btn btn-sm btn-success" id="admin" role="button">ADMIN (DATA SCIENTIST)</a>
+          </p>
+        </div>
+
+      </main>
+
+      <footer class="footer">
+        <p>© Igor Jovin 2017</p>
+      </footer>
+
+    </div> <!-- /container -->
+  
+
+</body>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
 <script type="text/javascript">
@@ -33,3 +81,5 @@ $("#user").click(function() {
   location.href = "/twitter/index-user/";
 });
 </script>
+</html>
+
