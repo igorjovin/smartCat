@@ -13,16 +13,11 @@ import nltk
 from sklearn.cluster import KMeans, MiniBatchKMeans
 import app.mod_twitter.services as twitter_service
 
-import tweepy
-from tweepy import OAuthHandler
-from tweepy import Stream
 import re
 import logging
 import sys
 from time import time
 import os
-from tweepy import OAuthHandler
-from tweepy import Stream
 from collections import defaultdict
 from config import BASE_DIR, APP_STATIC, TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET
 import app.mod_twitter.services as twitter_service
@@ -57,10 +52,6 @@ class TwitterKMeans():
             j = j + 1
         return preprocessed_tweets_with_groups, original_tweets_with_groups
 
-auth = OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
-auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
-api = tweepy.API(auth)#, proxy="http://proxy.uns.ac.rs:8080")
-
 preprocessed_tweets_with_groups = defaultdict(list)
 original_tweets_with_groups = defaultdict(list)
 tweets_to_show = defaultdict(list) #tweets which will be shown on the view - either original, or preprocessed
@@ -69,6 +60,7 @@ group_list = list()
 num_of_groups = 0
 showing_original_tweets = True
 used_hashtag = ""
+items_per_page = 200
 
 def cluster(hashtag, num_of_clusters):
     global preprocessed_tweets_with_groups
@@ -78,6 +70,7 @@ def cluster(hashtag, num_of_clusters):
     global num_of_groups
     global used_hashtag
     global showing_original_tweets
+    global items_per_page
 
     showing_original_tweets = True
     group_names = {}
@@ -85,11 +78,7 @@ def cluster(hashtag, num_of_clusters):
     hashtag = twitter_service.process_hashtag(hashtag)
     preprocessed_tweets = list()
     original_tweets = list()
-    for tweet in tweepy.Cursor(api.search, q=hashtag, lang="en").items(200):
-        tweet_text = twitter_service.process(tweet, hashtag)
-        if tweet_text not in preprocessed_tweets and len(tweet_text) > 1:
-           preprocessed_tweets.append(tweet_text)
-           original_tweets.append(tweet.text)
+    preprocessed_tweets, original_tweets = twitter_service.get_tweets_from_api(hashtag, items_per_page)
 
     kmeans = TwitterKMeans(num_of_clusters)
     preprocessed_tweets_with_groups, original_tweets_with_groups = kmeans.perform_clustering(preprocessed_tweets, original_tweets, num_of_clusters)
